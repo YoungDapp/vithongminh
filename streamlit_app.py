@@ -7,7 +7,7 @@ import os
 
 # --- CẤU HÌNH TRANG ---
 st.set_page_config(page_title="Ví Thông Thái Pro", layout="wide", page_icon="💎")
-st.title("💎 Ví Thông Thái ")
+st.title("💎 Ví Thông Thái")
 
 # --- FILE DỮ LIỆU ---
 TRANS_FILE = "dulieu_giaodich.csv"
