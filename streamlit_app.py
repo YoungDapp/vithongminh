@@ -4,258 +4,363 @@ import altair as alt
 import datetime
 from datetime import date
 import os
+import json
+import time
 
-# --- CẤU HÌNH TRANG ---
-st.set_page_config(page_title="Ví Thông Thái Pro", layout="wide", page_icon="💎")
-st.title("💎 Ví Thông Thái")
+# --- 1. CẤU HÌNH TRANG (PHẢI Ở DÒNG ĐẦU TIÊN) ---
+st.set_page_config(page_title="SmartWallet Pro", layout="wide", page_icon="💳")
 
 # --- FILE DỮ LIỆU ---
 TRANS_FILE = "dulieu_giaodich.csv"
 CAT_FILE = "dulieu_danhmuc.csv"
+CONFIG_FILE = "config.json"
 
-# --- HÀM TẢI DỮ LIỆU (CÓ TẠO DỮ LIỆU MẪU) ---
+# --- 2. CSS CAO CẤP (GLASSMORPHISM UI) ---
+def load_css():
+    st.markdown("""
+    <style>
+        /* Nền Gradient toàn trang */
+        .stApp {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        
+        /* Ẩn Header mặc định của Streamlit */
+        header[data-testid="stHeader"] {
+            visibility: hidden;
+        }
+        
+        /* Hiệu ứng kính (Glassmorphism) cho các Container */
+        div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"] {
+            /* background: rgba(255, 255, 255, 0.7); */
+            /* backdrop-filter: blur(10px); */
+            /* border-radius: 15px; */
+            /* padding: 20px; */
+            /* box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15); */
+        }
+
+        /* Style cho Metric (Thẻ số) */
+        div[data-testid="stMetric"] {
+            background-color: #ffffff;
+            border-left: 5px solid #4CAF50;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        /* Nút bấm (Button) đẹp hơn */
+        .stButton button {
+            border-radius: 20px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        /* Nút Primary (Lưu) */
+        .stButton button[kind="primary"] {
+            background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .stButton button[kind="primary"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        /* Nút Đăng xuất (Màu đỏ) */
+        button[data-testid="baseButton-secondary"] {
+            border-color: #ff4b4b;
+            color: #ff4b4b;
+        }
+        button[data-testid="baseButton-secondary"]:hover {
+            background-color: #ff4b4b;
+            color: white;
+        }
+
+        /* Tab Menu */
+        .stTabs [data-baseweb="tab-list"] {
+            background-color: white;
+            padding: 10px;
+            border-radius: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            gap: 10px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 20px;
+            padding: 8px 20px;
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            font-weight: bold;
+        }
+        
+        /* Form Login đẹp */
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+load_css()
+
+# --- 3. HỆ THỐNG BẢO MẬT (ĐÃ FIX LỖI) ---
+def login_system():
+    # Kiểm tra Session State
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+
+    # Nếu ĐÃ đăng nhập -> Trả về True để chạy App
+    if st.session_state.logged_in:
+        return True
+
+    # Nếu CHƯA đăng nhập -> Hiện Form
+    col_spacer1, col_login, col_spacer2 = st.columns([1, 1, 1]) # Căn giữa
+    
+    with col_login:
+        st.markdown("<br><br><br>", unsafe_allow_html=True) # Khoảng trống
+        st.markdown("<h1 style='text-align: center; color: #333;'>🔐 Ví Thông Thái</h1>", unsafe_allow_html=True)
+        
+        # Kiểm tra xem đã có file Config chưa
+        if not os.path.exists(CONFIG_FILE):
+            st.warning("⚠️ Lần đầu sử dụng: Hãy tạo mã PIN mới.")
+            with st.form("setup_form"):
+                pin1 = st.text_input("Tạo mã PIN (4 số)", type="password", max_chars=4)
+                pin2 = st.text_input("Nhập lại mã PIN", type="password", max_chars=4)
+                submit_setup = st.form_submit_button("Lưu & Vào App", use_container_width=True)
+                
+                if submit_setup:
+                    if len(pin1) == 4 and pin1.isdigit() and pin1 == pin2:
+                        with open(CONFIG_FILE, "w") as f:
+                            json.dump({"pin": pin1}, f)
+                        st.session_state.logged_in = True
+                        st.success("Tạo PIN thành công!")
+                        st.rerun()
+                    else:
+                        st.error("Mã PIN không khớp hoặc không đủ 4 số!")
+        else:
+            # ĐÃ CÓ PIN -> ĐĂNG NHẬP
+            with st.form("login_form"):
+                st.write("Nhập mã PIN để mở khóa:")
+                input_pin = st.text_input("Mã PIN", type="password", max_chars=4)
+                submit_login = st.form_submit_button("🔓 MỞ KHÓA", type="primary", use_container_width=True)
+                
+                if submit_login:
+                    with open(CONFIG_FILE, "r") as f:
+                        stored_pin = json.load(f).get("pin")
+                    
+                    if input_pin == stored_pin:
+                        st.session_state.logged_in = True
+                        st.toast("Đăng nhập thành công!", icon="🎉")
+                        time.sleep(0.5)
+                        st.rerun()
+                    else:
+                        st.error("❌ SAI MÃ PIN! Vui lòng thử lại.")
+    
+    # Dừng chương trình tại đây nếu chưa đăng nhập
+    st.stop() 
+
+# --- 4. HÀM XỬ LÝ DỮ LIỆU ---
 def load_data():
-    # 1. Xử lý File Giao dịch
     if os.path.exists(TRANS_FILE):
         df = pd.read_csv(TRANS_FILE)
-        # Chuyển đổi cột ngày
         df['Ngày'] = pd.to_datetime(df['Ngày']).dt.date
         df['Hạn trả'] = pd.to_datetime(df['Hạn trả'], errors='coerce').dt.date
     else:
-        # CHƯA CÓ FILE -> TẠO DỮ LIỆU MẪU
+        # Dữ liệu mẫu
         data_mau = [
-            [date.today(), "Lương tháng", 20000000, "Thu", "Lương", None, "Đã xong", "Lương cứng"],
-            [date.today(), "Tiền nhà", 5000000, "Chi", "Cố định", None, "Đã xong", "Đóng 3 tháng"],
-            [date.today(), "Cà phê sáng", 35000, "Chi", "Ăn uống", None, "Đã xong", "Highlands"],
-            [date.today(), "Vay bạn Tuấn", 5000000, "Thu", "Đi vay", date.today() + datetime.timedelta(days=7), "Đang nợ", "Hứa trả tuần sau"],
-            [date.today(), "Cho Lan mượn", 1000000, "Chi", "Cho vay", date.today() + datetime.timedelta(days=3), "Đang nợ", "Mua quần áo"],
+            [date.today(), "Lương tháng", 20000000, "Thu", "Lương", None, "Đã xong", "Demo"],
+            [date.today(), "Tiền nhà", 5000000, "Chi", "Cố định", None, "Đã xong", "Demo"],
         ]
         df = pd.DataFrame(data_mau, columns=['Ngày', 'Mục', 'Số tiền', 'Loại', 'Phân loại', 'Hạn trả', 'Trạng thái', 'Ghi chú'])
-        # LƯU NGAY LẬP TỨC RA FILE
         df.to_csv(TRANS_FILE, index=False)
     
-    # 2. Xử lý File Danh mục
     if os.path.exists(CAT_FILE):
-        cats_df = pd.read_csv(CAT_FILE)
-        cats = cats_df['Danh mục'].tolist()
+        cats = pd.read_csv(CAT_FILE)['Danh mục'].tolist()
     else:
-        # CHƯA CÓ FILE -> TẠO DANH MỤC MẪU
         cats = ["Ăn uống", "Di chuyển", "Cố định", "Mua sắm", "Lương", "Đi vay", "Cho vay", "Khác"]
-        # LƯU NGAY LẬP TỨC RA FILE
         pd.DataFrame(cats, columns=['Danh mục']).to_csv(CAT_FILE, index=False)
-    
     return df, cats
 
-def save_transactions():
+def save_data():
     st.session_state.data.to_csv(TRANS_FILE, index=False)
-
-def save_categories():
     pd.DataFrame(st.session_state.categories, columns=['Danh mục']).to_csv(CAT_FILE, index=False)
 
-# --- KHỞI TẠO SESSION STATE ---
-if 'data' not in st.session_state:
-    df_loaded, cats_loaded = load_data()
-    st.session_state.data = df_loaded
-    st.session_state.categories = cats_loaded
-
-# Khởi tạo các biến widget
-defaults = {
-    'widget_new_desc': "",
-    'widget_deadline': date.today(),
-    'widget_amount': 0,
-    'widget_note': "",
-    'widget_is_debt': False
-}
-for key, val in defaults.items():
-    if key not in st.session_state:
-        st.session_state[key] = val
-
-# --- HÀM CALLBACK (LƯU & RESET) ---
-def save_transaction_callback():
-    amount = st.session_state.widget_amount
-    desc_option = st.session_state.widget_desc_select
-    new_desc = st.session_state.get('widget_new_desc', "")
-    trans_type = st.session_state.widget_type
-    category = st.session_state.widget_category
-    is_debt = st.session_state.widget_is_debt
-    note = st.session_state.widget_note
-    
-    final_description = new_desc if desc_option == "➕ Nhập nội dung mới..." else desc_option
-
-    if amount > 0 and final_description:
-        real_type = "Chi" if "Chi" in trans_type else "Thu"
-        deadline_val = st.session_state.get('widget_deadline', date.today())
-        deadline = deadline_val if is_debt else None
-        status = "Đang nợ" if is_debt else "Đã xong"
-        
-        new_row = [date.today(), final_description, amount, real_type, category, deadline, status, note]
-        st.session_state.data.loc[len(st.session_state.data)] = new_row
-        
-        save_transactions() # Lưu file
-        
-        st.toast(f"✅ Đã lưu: {final_description}", icon="💾")
-        
-        # Reset
-        st.session_state.widget_amount = 0
-        st.session_state.widget_new_desc = ""
-        st.session_state.widget_note = ""
-        st.session_state.widget_is_debt = False
-        st.session_state.widget_desc_select = "➕ Nhập nội dung mới..." 
-    else:
-        st.toast("⚠️ Thiếu nội dung hoặc số tiền!", icon="RW")
-
-# --- GIAO DIỆN CHÍNH ---
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Tổng quan", "📒 Sổ Nợ & Cảnh báo", "📝 Dữ liệu chi tiết", "⚙️ Cấu hình"])
-
-# ==========================================
-# TAB 1: NHẬP LIỆU & DASHBOARD
-# ==========================================
-with tab1:
-    col_input, col_dash = st.columns([1, 2])
-    
-    with col_input:
-        st.markdown("### ➕ Nhập giao dịch")
-        history = st.session_state.data['Mục'].unique().tolist() if not st.session_state.data.empty else []
-        if history: history.reverse()
-        opt_list = ["➕ Nhập nội dung mới..."] + history
-        
-        st.selectbox("Nội dung", opt_list, key="widget_desc_select")
-        
-        if st.session_state.widget_desc_select == "➕ Nhập nội dung mới...":
-            st.text_input("Gõ tên khoản mục:", key="widget_new_desc")
-            
-        st.number_input("Số tiền (VNĐ)", min_value=0, step=50000, key="widget_amount")
-        
-        c1, c2 = st.columns(2)
-        with c1: st.radio("Loại", ["Chi (Tiền đi)", "Thu (Tiền về)"], key="widget_type")
-        with c2: st.selectbox("Phân loại", st.session_state.categories, key="widget_category")
-        
-        st.checkbox("Theo dõi Vay/Nợ?", key="widget_is_debt")
-        if st.session_state.widget_is_debt:
-            st.date_input("Hạn xử lý", key="widget_deadline")
-            
-        st.text_input("Ghi chú", key="widget_note")
-        
-        st.button("Lưu Giao Dịch", type="primary", use_container_width=True, on_click=save_transaction_callback)
-
-    with col_dash:
-        df = st.session_state.data
-        if not df.empty:
-            inc = df[df['Loại']=='Thu']['Số tiền'].sum()
-            exp = df[df['Loại']=='Chi']['Số tiền'].sum()
-            balance = inc - exp
-            
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Tổng Thu", f"{inc:,.0f}")
-            m2.metric("Tổng Chi", f"{exp:,.0f}", delta=f"-{exp:,.0f}", delta_color="inverse")
-            m3.metric("Số Dư", f"{balance:,.0f}")
-            
-            st.divider()
-            
-            st.subheader("📈 Phân bổ chi tiêu")
-            exp_df = df[(df['Loại'] == 'Chi') & (df['Phân loại'] != 'Cho vay')]
-            
-            if not exp_df.empty:
-                chart_data = exp_df.groupby('Phân loại')['Số tiền'].sum().reset_index()
-                c_chart1, c_chart2 = st.columns(2)
-                with c_chart1:
-                    pie = alt.Chart(chart_data).mark_arc(innerRadius=50).encode(
-                        theta=alt.Theta("Số tiền", stack=True),
-                        color="Phân loại",
-                        tooltip=["Phân loại", "Số tiền"]
-                    ).properties(height=250)
-                    st.altair_chart(pie, use_container_width=True)
-                with c_chart2:
-                    bar = alt.Chart(exp_df).mark_bar().encode(
-                        x='sum(Số tiền)',
-                        y=alt.Y('Phân loại', sort='-x'),
-                        color='Phân loại',
-                        tooltip=['Phân loại', 'sum(Số tiền)']
-                    ).properties(height=250)
-                    st.altair_chart(bar, use_container_width=True)
-            else:
-                st.info("Chưa có dữ liệu chi tiêu để vẽ biểu đồ.")
-        else:
-            st.info("Đang tạo dữ liệu mẫu...")
-            st.rerun()
-
-# ==========================================
-# TAB 2: SỔ NỢ
-# ==========================================
-with tab2:
-    st.header("⏳ Theo dõi Vay & Nợ")
-    df = st.session_state.data
-    if not df.empty:
-        debt_df = df[df['Trạng thái'] == 'Đang nợ'].copy()
-        
-        my_debt = debt_df[debt_df['Loại'] == 'Thu']['Số tiền'].sum()
-        other_debt = debt_df[debt_df['Loại'] == 'Chi']['Số tiền'].sum()
-        
-        col_d1, col_d2 = st.columns(2)
-        col_d1.error(f"❌ Mình đang nợ: {my_debt:,.0f} đ")
-        col_d2.success(f"✅ Người ta nợ mình: {other_debt:,.0f} đ")
+# --- 5. GIAO DIỆN CHÍNH (APP) ---
+def main_app():
+    # --- SIDEBAR (THANH BÊN TRÁI) ---
+    with st.sidebar:
+        st.image("https://cdn-icons-png.flaticon.com/512/1077/1077114.png", width=80) # Icon ví tiền
+        st.title("Smart Wallet")
+        st.caption("Quản lý tài chính cá nhân")
         
         st.divider()
         
-        if not debt_df.empty:
-            today = date.today()
-            st.subheader("⚠️ Cảnh báo hạn trả")
-            for index, row in debt_df.iterrows():
-                if pd.notnull(row['Hạn trả']):
-                    days_left = (row['Hạn trả'] - today).days
-                    msg = f"[{row['Loại']}] **{row['Mục']}**: {row['Số tiền']:,} đ (Hạn: {row['Hạn trả']})"
-                    if days_left < 0:
-                        st.error(f"QUÁ HẠN {abs(days_left)} NGÀY: {msg}")
-                    elif days_left <= 3:
-                        st.warning(f"GẤP (Còn {days_left} ngày): {msg}")
-                    else:
-                        st.info(f"Sắp tới (Còn {days_left} ngày): {msg}")
+        # Nút ĐĂNG XUẤT TO VÀ RÕ RÀNG
+        if st.button("🔒 KHÓA ỨNG DỤNG NGAY", type="secondary", use_container_width=True):
+            st.session_state.logged_in = False
+            st.rerun()
+            
+        st.info("💡 Mẹo: Nhập liệu đều đặn để quản lý tốt hơn.")
+
+    # --- KHỞI TẠO DỮ LIỆU ---
+    if 'data' not in st.session_state:
+        df_l, cat_l = load_data()
+        st.session_state.data = df_l
+        st.session_state.categories = cat_l
+
+    # Init Widgets
+    defaults = {'w_desc': "", 'w_amt': 0, 'w_note': "", 'w_debt': False, 'w_date': date.today()}
+    for k, v in defaults.items():
+        if k not in st.session_state: st.session_state[k] = v
+
+    # --- CALLBACK LƯU ---
+    def save_cb():
+        amt = st.session_state.w_amt
+        desc_opt = st.session_state.w_opt
+        new_desc = st.session_state.w_desc
+        final = new_desc if desc_opt == "➕ Mục mới..." else desc_opt
+        
+        if amt > 0 and final:
+            row = [
+                date.today(), final, amt,
+                "Thu" if "Thu" in st.session_state.w_type else "Chi",
+                st.session_state.w_cat,
+                st.session_state.w_date if st.session_state.w_debt else None,
+                "Đang nợ" if st.session_state.w_debt else "Đã xong",
+                st.session_state.w_note
+            ]
+            st.session_state.data.loc[len(st.session_state.data)] = row
+            save_data()
+            st.toast("Đã lưu thành công!", icon="✅")
+            
+            # Reset
+            st.session_state.w_amt = 0
+            st.session_state.w_desc = ""
+            st.session_state.w_note = ""
+            st.session_state.w_debt = False
+            st.session_state.w_opt = "➕ Mục mới..."
         else:
-            st.success("Sổ nợ sạch sẽ!")
+            st.toast("Thiếu thông tin!", icon="⚠️")
 
-# ==========================================
-# TAB 3: DATA EDITOR
-# ==========================================
-with tab3:
-    st.info("💡 Dữ liệu mẫu đã được tạo. Bạn có thể sửa xóa trực tiếp tại đây.")
-    edited_df = st.data_editor(
-        st.session_state.data,
-        num_rows="dynamic",
-        use_container_width=True,
-        column_config={
-            "Số tiền": st.column_config.NumberColumn(format="%d đ"),
-            "Phân loại": st.column_config.SelectboxColumn(options=st.session_state.categories),
-            "Loại": st.column_config.SelectboxColumn(options=["Thu", "Chi"]),
-            "Trạng thái": st.column_config.SelectboxColumn(options=["Đang nợ", "Đã xong"]),
-            "Ngày": st.column_config.DateColumn(format="DD/MM/YYYY"),
-            "Hạn trả": st.column_config.DateColumn(format="DD/MM/YYYY"),
-        },
-        key="main_editor"
-    )
-    if not edited_df.equals(st.session_state.data):
-        st.session_state.data = edited_df
-        save_transactions()
-        st.rerun()
+    # --- TABS GIAO DIỆN ---
+    tab1, tab2, tab3 = st.tabs(["📊 TỔNG QUAN", "📒 SỔ NỢ", "⚙️ CÀI ĐẶT"])
 
-# ==========================================
-# TAB 4: CẤU HÌNH
-# ==========================================
-with tab4:
-    st.subheader("🛠 Quản lý Phân loại")
-    col_c1, col_c2 = st.columns(2)
-    with col_c1:
-        st.write("**Xóa danh mục:**")
-        cat_to_del = st.selectbox("Chọn:", st.session_state.categories)
-        if st.button("Xóa"):
-            if len(st.session_state.categories) > 1:
-                st.session_state.categories.remove(cat_to_del)
-                save_categories()
-                st.rerun()
-    with col_c2:
-        st.write("**Thêm danh mục:**")
-        new_cat = st.text_input("Tên mới:")
+    # TAB 1: DASHBOARD
+    with tab1:
+        # 1. Thẻ số liệu (Cards)
+        df = st.session_state.data
+        inc = df[df['Loại']=='Thu']['Số tiền'].sum()
+        exp = df[df['Loại']=='Chi']['Số tiền'].sum()
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Tổng Thu Nhập", f"{inc:,.0f} đ")
+        c2.metric("Tổng Chi Tiêu", f"{exp:,.0f} đ", delta=f"-{exp:,.0f}", delta_color="inverse")
+        c3.metric("Số Dư Hiện Tại", f"{(inc-exp):,.0f} đ")
+
+        st.markdown("---")
+        
+        # 2. Layout Nhập & Biểu đồ
+        col_left, col_right = st.columns([1, 1.5], gap="medium")
+        
+        with col_left:
+            with st.container(border=True):
+                st.subheader("📝 Nhập Giao Dịch")
+                
+                # Logic chọn lịch sử
+                hist = df['Mục'].unique().tolist() if not df.empty else []
+                if hist: hist.reverse()
+                
+                st.selectbox("Nội dung", ["➕ Mục mới..."] + hist, key="w_opt")
+                if st.session_state.w_opt == "➕ Mục mới...":
+                    st.text_input("Tên mục chi tiêu:", key="w_desc", placeholder="VD: Ăn trưa...")
+                
+                st.number_input("Số tiền (VNĐ):", min_value=0, step=50000, key="w_amt")
+                
+                cc1, cc2 = st.columns(2)
+                with cc1: st.radio("Loại giao dịch:", ["Chi tiền", "Thu tiền"], key="w_type")
+                with cc2: st.selectbox("Danh mục:", st.session_state.categories, key="w_cat")
+                
+                st.checkbox("Theo dõi nợ?", key="w_debt")
+                if st.session_state.w_debt:
+                    st.date_input("Hạn xử lý:", key="w_date")
+                
+                st.text_input("Ghi chú:", key="w_note")
+                
+                st.button("LƯU NGAY", type="primary", use_container_width=True, on_click=save_cb)
+
+        with col_right:
+            with st.container(border=True):
+                st.subheader("📈 Biểu đồ Chi Tiêu")
+                exp_df = df[(df['Loại']=='Chi') & (df['Phân loại']!='Cho vay')]
+                if not exp_df.empty:
+                    chart_data = exp_df.groupby('Phân loại')['Số tiền'].sum().reset_index()
+                    
+                    # Biểu đồ tròn đẹp hơn
+                    base = alt.Chart(chart_data).encode(theta=alt.Theta("Số tiền", stack=True))
+                    pie = base.mark_arc(innerRadius=60, outerRadius=100, cornerRadius=5).encode(
+                        color=alt.Color("Phân loại", scale=alt.Scale(scheme='tableau10')),
+                        order=alt.Order("Số tiền", sort="descending"),
+                        tooltip=["Phân loại", "Số tiền"]
+                    )
+                    text = base.mark_text(radius=120).encode(
+                        text=alt.Text("Số tiền", format=",.0f"),
+                        order=alt.Order("Số tiền", sort="descending")  
+                    )
+                    st.altair_chart(pie + text, use_container_width=True)
+                else:
+                    st.info("Chưa có dữ liệu chi tiêu.")
+
+    # TAB 2: SỔ NỢ & DATA
+    with tab2:
+        st.subheader("Quản lý Vay & Nợ")
+        debt_df = df[df['Trạng thái'] == 'Đang nợ']
+        if not debt_df.empty:
+            for i, row in debt_df.iterrows():
+                # Card nợ tùy chỉnh
+                color = "#ffebee" if row['Loại'] == 'Thu' else "#e8f5e9" # Đỏ nhạt nếu mình nợ, Xanh nhạt nếu nợ mình
+                icon = "💸" if row['Loại'] == 'Thu' else "💰"
+                txt = "Mình nợ" if row['Loại'] == 'Thu' else "Nợ mình"
+                
+                st.markdown(f"""
+                <div style="background-color: {color}; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid {'red' if row['Loại'] == 'Thu' else 'green'}">
+                    <b>{icon} {txt}: {row['Mục']}</b> - {row['Số tiền']:,} đ <br>
+                    <small>Hạn: {row['Hạn trả']} | Ghi chú: {row['Ghi chú']}</small>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.success("Hiện tại không có khoản nợ nào!")
+
+        st.divider()
+        st.subheader("Dữ liệu chi tiết (Sửa trực tiếp)")
+        edited = st.data_editor(
+            df, 
+            column_config={
+                "Số tiền": st.column_config.NumberColumn(format="%d đ"),
+                "Trạng thái": st.column_config.SelectboxColumn(options=["Đang nợ", "Đã xong"])
+            },
+            use_container_width=True, num_rows="dynamic"
+        )
+        if not edited.equals(df):
+            st.session_state.data = edited
+            save_data()
+            st.rerun()
+
+    # TAB 3: CÀI ĐẶT
+    with tab3:
+        st.write("Cấu hình danh mục")
+        new_cat = st.text_input("Thêm danh mục mới:")
         if st.button("Thêm"):
             if new_cat and new_cat not in st.session_state.categories:
                 st.session_state.categories.append(new_cat)
-                save_categories()
+                save_data()
                 st.rerun()
+        
+        st.write("Danh sách hiện tại (Chọn để xóa):")
+        st.multiselect("Danh mục", st.session_state.categories, st.session_state.categories, disabled=True)
+
+# --- CHẠY CHƯƠNG TRÌNH ---
+# Gọi hàm login_system() trước. Chỉ khi hàm này trả về True thì main_app() mới được chạy.
+login_system()
+main_app()
