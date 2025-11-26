@@ -215,31 +215,42 @@ def main_app():
     for k, v in defaults.items():
         if k not in st.session_state: st.session_state[k] = v
 
-    # --- CALLBACK LƯU ---
+   # --- CALLBACK LƯU (ĐÃ SỬA LỖI ATTRIBUTE ERROR) ---
     def save_cb():
-        amt = st.session_state.w_amt
-        desc_opt = st.session_state.w_opt
-        new_desc = st.session_state.w_desc
+        # Lấy giá trị an toàn bằng .get() để tránh lỗi khi ô nhập bị ẩn
+        amt = st.session_state.get("w_amt", 0)
+        desc_opt = st.session_state.get("w_opt", "")
+        
+        # DÒNG QUAN TRỌNG ĐÃ SỬA: Dùng .get() thay vì gọi trực tiếp
+        new_desc = st.session_state.get("w_desc", "")
+        
         final = new_desc if desc_opt == "➕ Mục mới..." else desc_opt
         
         if amt > 0 and final:
+            # Lấy các thông số khác
+            w_type = st.session_state.get("w_type", "Chi")
+            w_cat = st.session_state.get("w_cat", "Khác")
+            w_debt = st.session_state.get("w_debt", False)
+            w_date = st.session_state.get("w_date", date.today())
+            w_note = st.session_state.get("w_note", "")
+
             row = [
                 date.today(), final, amt,
-                "Thu" if "Thu" in st.session_state.w_type else "Chi",
-                st.session_state.w_cat,
-                st.session_state.w_date if st.session_state.w_debt else None,
-                "Đang nợ" if st.session_state.w_debt else "Đã xong",
-                st.session_state.w_note
+                "Thu" if "Thu" in w_type else "Chi",
+                w_cat,
+                w_date if w_debt else None,
+                "Đang nợ" if w_debt else "Đã xong",
+                w_note
             ]
             st.session_state.data.loc[len(st.session_state.data)] = row
             save_data()
             st.toast("Đã lưu thành công!", icon="✅")
             
-            # Reset
+            # Reset Form (Dùng safe reset)
             st.session_state.w_amt = 0
-            st.session_state.w_desc = ""
-            st.session_state.w_note = ""
-            st.session_state.w_debt = False
+            if "w_desc" in st.session_state: st.session_state.w_desc = "" # Chỉ xóa nếu nó đang hiện
+            if "w_note" in st.session_state: st.session_state.w_note = ""
+            if "w_debt" in st.session_state: st.session_state.w_debt = False
             st.session_state.w_opt = "➕ Mục mới..."
         else:
             st.toast("Thiếu thông tin!", icon="⚠️")
