@@ -280,7 +280,7 @@ def main_app():
     df, categories = load_data()
     st.session_state.categories = categories
 
-    # --- CALLBACKS (GIỮ NGUYÊN) ---
+   # --- CALLBACKS ---
     def save_callback():
         amt = st.session_state.get("w_amt", 0)
         desc_opt = st.session_state.get("w_opt", "")
@@ -302,16 +302,19 @@ def main_app():
             
             if add_transaction_db(row_data):
                 st.toast("Đã lưu lên Cloud!", icon="☁️")
+                
+                # Reset Form
                 st.session_state.w_amt = 0
                 if "w_desc" in st.session_state: st.session_state.w_desc = ""
                 st.session_state.w_opt = "➕ Mục mới..."
-                time.sleep(0.5)
-                st.rerun()
+                
+                # time.sleep(0.5)  <-- Có thể giữ hoặc bỏ tùy bạn
+                # st.rerun()     <-- XÓA DÒNG NÀY ĐI
         else:
             st.toast("Thiếu thông tin!", icon="⚠️")
 
     # --- UI CHÍNH ---
-    st.title("Tổng Quan Tài Chính")
+    st.title("Tổng Quan")
 
     tab1, tab2, tab3 = st.tabs(["📊 DASHBOARD", "⏳ SỔ NỢ", "⚙️ CÀI ĐẶT"])
 
@@ -437,7 +440,7 @@ def main_app():
 
     with tab3:
          with st.container():
-            st.subheader("Cấu hình Danh mục (Lưu trên Server)")
+            st.subheader("Cấu hình Danh mục")
             c1, c2 = st.columns(2, gap="large")
             with c1:
                 st.write("Thêm danh mục mới:")
