@@ -18,14 +18,15 @@ except Exception as e:
     st.error("❌ Thiếu cấu hình Supabase!")
     st.stop()
 
-# --- 2. CSS CAO CẤP (NEON PRO) ---
+# --- 2. CSS CAO CẤP (V13 NEON PRO) ---
 def load_css():
     st.markdown("""
     <style>
-        /* Nền & Font */
+        /* Font & Nền */
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap');
         .stApp {
             background: radial-gradient(circle at 10% 20%, #1a1c29 0%, #0f0c29 90%);
-            color: #e0e0ff; font-family: sans-serif;
+            color: #e0e0ff; font-family: 'Outfit', sans-serif;
         }
         header {visibility: hidden;}
         .block-container { padding-top: 1.5rem !important; padding-bottom: 5rem !important; }
@@ -38,17 +39,32 @@ def load_css():
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
         }
 
-        /* Metric Cards */
-        div[data-testid="stMetric"] {
-            background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(0, 242, 195, 0.3);
-            border-radius: 12px; padding: 10px;
+        /* --- CUSTOM METRIC CARDS (THẺ CHỈ SỐ PRO) --- */
+        .metric-card {
+            background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px);
+            border-radius: 16px; padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.2s;
         }
-        div[data-testid="stMetricLabel"] label { color: #aaa !important; }
-        div[data-testid="stMetricValue"] { color: #00f2c3 !important; text-shadow: 0 0 10px rgba(0, 242, 195, 0.4); }
+        .metric-card:hover { transform: translateY(-3px); }
+        
+        .card-income { border-bottom: 3px solid #00f2c3; box-shadow: 0 5px 20px -10px rgba(0, 242, 195, 0.2); }
+        .card-expense { border-bottom: 3px solid #ff4b4b; box-shadow: 0 5px 20px -10px rgba(255, 75, 75, 0.2); }
+        .card-balance { border-bottom: 3px solid #7000ff; box-shadow: 0 5px 20px -10px rgba(112, 0, 255, 0.2); }
 
-        /* Button Style */
+        .metric-label { font-size: 0.85rem; color: #ccc; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .metric-value { font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
+        .metric-delta { font-size: 0.8rem; font-weight: 500; padding: 2px 8px; border-radius: 8px; display: inline-block; }
+        
+        .text-green { color: #00f2c3; text-shadow: 0 0 15px rgba(0, 242, 195, 0.3); }
+        .text-red { color: #ff4b4b; text-shadow: 0 0 15px rgba(255, 75, 75, 0.3); }
+        .text-purple { color: #a742ff; text-shadow: 0 0 15px rgba(167, 66, 255, 0.3); }
+        .bg-green-soft { background: rgba(0, 242, 195, 0.15); color: #00f2c3; }
+        .bg-red-soft { background: rgba(255, 75, 75, 0.15); color: #ff4b4b; }
+
+        /* Button Style (Pill Shape) */
         div.stButton > button {
-            width: 100%; border-radius: 12px; font-weight: 700;
+            width: 100%; border-radius: 12px; font-weight: 600;
             border: 1px solid #00f2c3; background: rgba(255, 255, 255, 0.05);
             color: #00f2c3; transition: all 0.2s; padding: 0.5rem 1rem;
         }
@@ -57,13 +73,8 @@ def load_css():
         }
         div.stButton > button:active { background: #00f2c3; color: #000; }
         
-        /* Logout Button (Red) */
-        div.stButton > button.logout-btn {
-            border-color: #ff4b4b !important; color: #ff4b4b !important;
-        }
-        div.stButton > button.logout-btn:hover {
-            background: rgba(255, 75, 75, 0.1) !important; box-shadow: 0 0 15px rgba(255, 75, 75, 0.3) !important;
-        }
+        /* Logout Button */
+        div.stButton > button.logout-btn { border-color: #ff4b4b !important; color: #ff4b4b !important; }
 
         /* Inputs & Editor */
         .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div, [data-testid="stDataEditor"] {
@@ -71,11 +82,17 @@ def load_css():
             border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 8px !important;
         }
         
-        /* Tabs */
-        .stTabs [data-baseweb="tab-list"] { gap: 5px; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 10px; }
-        .stTabs [aria-selected="true"] { background: rgba(0,242,195,0.2) !important; color: #00f2c3 !important; }
+        /* Tabs (Pill Shape) */
+        .stTabs [data-baseweb="tab-list"] { 
+            gap: 8px; background: rgba(255,255,255,0.05); padding: 6px; border-radius: 30px; justify-content: center; 
+        }
+        .stTabs [data-baseweb="tab"] { border-radius: 20px; border: none; color: #aaa; }
+        .stTabs [aria-selected="true"] { 
+            background: linear-gradient(90deg, #00f2c3, #0098f0); color: #fff !important; font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0, 242, 195, 0.3);
+        }
         
-        /* Login UI */
+        /* Login Dots */
         .pin-area { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
         .dot { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #555; transition: 0.2s; }
         .dot.active { background: #00f2c3; border-color: #00f2c3; box-shadow: 0 0 10px #00f2c3; }
@@ -83,7 +100,7 @@ def load_css():
     """, unsafe_allow_html=True)
 load_css()
 
-# --- 3. DATABASE ---
+# --- 3. DATABASE & LOGIC ---
 # @st.cache_data(ttl=30)
 def load_data():
     try:
@@ -106,7 +123,7 @@ def del_trans_list(ids): supabase.table('transactions').delete().in_('id', ids).
 def add_cat(n): supabase.table('categories').insert({"ten_danh_muc": n}).execute()
 def del_cat(n): supabase.table('categories').delete().eq('ten_danh_muc', n).execute()
 
-# KPI Calculation
+# Hàm tính toán KPI (% Tăng trưởng)
 def calculate_kpis(df):
     if df.empty: return 0, 0, 0, 0, 0
     today = pd.Timestamp.now()
@@ -121,8 +138,9 @@ def calculate_kpis(df):
     last_inc = last_m[last_m['loai']=='Thu']['so_tien'].sum()
     last_exp = last_m[last_m['loai']=='Chi']['so_tien'].sum()
     
-    pct_inc = ((inc - last_inc)/last_inc)*100 if last_inc else 0
-    pct_exp = ((exp - last_exp)/last_exp)*100 if last_exp else 0
+    # Tránh chia cho 0
+    pct_inc = ((inc - last_inc)/last_inc)*100 if last_inc > 0 else (100 if inc > 0 else 0)
+    pct_exp = ((exp - last_exp)/last_exp)*100 if last_exp > 0 else (100 if exp > 0 else 0)
     return inc, exp, bal, pct_inc, pct_exp
 
 # --- 4. HỆ THỐNG ĐĂNG NHẬP ---
@@ -142,7 +160,7 @@ def login_system():
 
     _, col_mid, _ = st.columns([1, 10, 1])
     with col_mid:
-        st.markdown("<div class='login-box'><h1 style='text-align: center;'>🔒 SmartWallet Pro</h1>", unsafe_allow_html=True)
+        st.markdown("<div class='login-box'><br><h1 style='text-align: center;'>🔒 SmartWallet Pro</h1>", unsafe_allow_html=True)
         dots = '<div class="pin-area">'
         for i in range(4):
             state = "active" if i < len(st.session_state.pin_buffer) else ""
@@ -189,14 +207,13 @@ def main_app():
     df, cats = load_data()
     st.session_state.categories = cats
     
-    # Init Keys
+    # Init keys
     if 'w_opt' not in st.session_state: st.session_state.w_opt = "➕ Mới..."
     if 'w_desc' not in st.session_state: st.session_state.w_desc = ""
     if 'w_amt' not in st.session_state: st.session_state.w_amt = 0
     if 'w_note' not in st.session_state: st.session_state.w_note = ""
     if 'w_debt' not in st.session_state: st.session_state.w_debt = False
 
-    # Callback Lưu
     def save_callback():
         opt = st.session_state.w_opt
         desc = st.session_state.w_desc
@@ -214,12 +231,11 @@ def main_app():
             }
             add_trans(row)
             st.toast("Đã lưu!", icon="✨")
-            # Reset
+            # Reset Form
             st.session_state.w_amt = 0; st.session_state.w_desc = ""; st.session_state.w_note = ""
             st.session_state.w_debt = False; st.session_state.w_opt = "➕ Mới..."
         else: st.toast("Thiếu thông tin!", icon="⚠️")
 
-    # Sidebar
     with st.sidebar:
         st.title("⚡ Menu")
         if st.button("🔄 Tải lại"): st.cache_data.clear(); st.rerun()
@@ -228,19 +244,23 @@ def main_app():
     tab1, tab2, tab3 = st.tabs(["📊 TỔNG QUAN", "⏳ SỔ NỢ", "⚙️ CÀI ĐẶT"])
 
     with tab1:
-        # KPI Cards
+        # --- PHẦN 1: THẺ CHỈ SỐ CUSTOM (V13) ---
         inc, exp, bal, pi, pe = calculate_kpis(df)
+        
         ci = "text-green" if pi>=0 else "text-red"
-        ce = "text-red" if pe>=0 else "text-green"
+        icon_i = "↗" if pi>=0 else "↘"
+        
+        ce = "text-red" if pe>=0 else "text-green" # Chi tăng là xấu (Đỏ)
+        icon_e = "↗" if pe>=0 else "↘"
         
         c1, c2, c3 = st.columns(3)
-        with c1: st.markdown(f'<div class="metric-card card-income"><div class="metric-label">Thu (Tháng này)</div><div class="metric-value text-green">{inc:,.0f}</div><div class="metric-delta {ci}">{pi:+.1f}%</div></div>', unsafe_allow_html=True)
-        with c2: st.markdown(f'<div class="metric-card card-expense"><div class="metric-label">Chi (Tháng này)</div><div class="metric-value text-red">{exp:,.0f}</div><div class="metric-delta {ce}">{pe:+.1f}%</div></div>', unsafe_allow_html=True)
-        with c3: st.markdown(f'<div class="metric-card card-balance"><div class="metric-label">Số Dư</div><div class="metric-value text-purple">{bal:,.0f}</div><div class="metric-delta">Cashflow</div></div>', unsafe_allow_html=True)
+        with c1: st.markdown(f'<div class="metric-card card-income"><div class="metric-label">Thu Nhập</div><div class="metric-value text-green">{inc:,.0f}</div><div class="metric-delta bg-green-soft">{icon_i} {abs(pi):.1f}%</div></div>', unsafe_allow_html=True)
+        with c2: st.markdown(f'<div class="metric-card card-expense"><div class="metric-label">Chi Tiêu</div><div class="metric-value text-red">{exp:,.0f}</div><div class="metric-delta bg-red-soft">{icon_e} {abs(pe):.1f}%</div></div>', unsafe_allow_html=True)
+        with c3: st.markdown(f'<div class="metric-card card-balance"><div class="metric-label">Số Dư</div><div class="metric-value text-purple">{bal:,.0f}</div><div class="metric-delta" style="color:#aaa">Cashflow</div></div>', unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Nhập & Chart
+        # --- PHẦN 2: NHẬP & CHART ---
         c_left, c_right = st.columns([1, 1.6], gap="large")
         with c_left:
             with st.container():
@@ -255,7 +275,7 @@ def main_app():
                 with c2: st.selectbox("Nhóm:", st.session_state.categories, key="w_cat")
                 st.checkbox("Vay/Nợ?", key="w_debt")
                 if st.session_state.w_debt: st.date_input("Hạn:", key="w_date")
-                st.text_input("Note:", key="w_note")
+                st.text_input("Ghi chú:", key="w_note")
                 st.button("LƯU NGAY ✨", type="primary", on_click=save_callback, use_container_width=True)
 
         with c_right:
@@ -265,6 +285,8 @@ def main_app():
                     exp_df = df[(df['loai']=='Chi') & (df['phan_loai']!='Cho vay')]
                     if not exp_df.empty:
                         chart_data = exp_df.groupby('phan_loai')['so_tien'].sum().reset_index()
+                        
+                        # Chart trong suốt (V13)
                         base = alt.Chart(chart_data).encode(theta=alt.Theta("so_tien", stack=True))
                         pie = base.mark_arc(innerRadius=65, outerRadius=100, cornerRadius=5).encode(
                             color=alt.Color("phan_loai", scale=alt.Scale(scheme='turbo'), legend=None),
@@ -273,15 +295,15 @@ def main_app():
                         text = base.mark_text(radius=120, fill="#00f2c3").encode(text=alt.Text("so_tien", format=",.0f"), order=alt.Order("so_tien", sort="descending"))
                         st.altair_chart((pie + text).properties(background='transparent'), use_container_width=True)
                         
-                        st.caption("Chi tiết danh mục:")
+                        # List chi tiết
                         for _, row in chart_data.sort_values('so_tien', ascending=False).iterrows():
-                            st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05)'><span style='color:#ddd'>{row['phan_loai']}</span><span style='color:#00f2c3; font-weight:bold'>{row['so_tien']:,.0f}</span></div>", unsafe_allow_html=True)
-                    else: st.info("Chưa có chi tiêu.")
+                            st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05)'><span style='color:#ddd'>▫️ {row['phan_loai']}</span><span style='color:#00f2c3; font-weight:bold'>{row['so_tien']:,.0f}</span></div>", unsafe_allow_html=True)
+                    else: st.info("Chưa có dữ liệu chi.")
                 else: st.info("Trống.")
 
         st.divider()
         
-        # --- LỊCH SỬ & CHỈNH SỬA THÔNG MINH ---
+        # --- PHẦN 3: SMART HISTORY (V14) ---
         with st.container():
             st.subheader("📅 Lịch sử & Chỉnh sửa")
             if not df.empty:
@@ -293,37 +315,35 @@ def main_app():
                 df_show = df[df['ngay'].dt.date == f_date].copy() if view == "Chỉ ngày này" else df.copy()
                 
                 if not df_show.empty:
-                    df_show['Xóa'] = False # Cột checkbox
+                    df_show['Xóa'] = False 
                     
                     # Bảng Edit
                     edited = st.data_editor(
                         df_show,
                         column_config={
-                            "id": None, # Ẩn ID
+                            "id": None,
                             "ngay": st.column_config.DatetimeColumn("Thời gian", format="DD/MM/YYYY HH:mm"),
                             "muc": "Mục",
                             "so_tien": st.column_config.NumberColumn("Số tiền", format="%d"),
                             "loai": st.column_config.SelectboxColumn("Loại", options=["Thu", "Chi"]),
                             "phan_loai": st.column_config.SelectboxColumn("Nhóm", options=st.session_state.categories),
                             "trang_thai": st.column_config.SelectboxColumn("Status", options=["Đã xong", "Đang nợ"]),
-                            "Xóa": st.column_config.CheckboxColumn("❌ Xóa", help="Tick để xóa", default=False)
+                            "Xóa": st.column_config.CheckboxColumn("❌ Xóa", default=False)
                         },
                         use_container_width=True, hide_index=True, key="history_edit"
                     )
                     
                     # Nút Lưu Thay Đổi
                     if st.button("💾 CẬP NHẬT THAY ĐỔI", type="primary", use_container_width=True):
-                        # 1. Xử lý xóa
+                        # Xóa
                         to_del = edited[edited['Xóa']==True]['id'].tolist()
                         if to_del: del_trans_list(to_del); st.toast(f"Đã xóa {len(to_del)} dòng")
                         
-                        # 2. Xử lý sửa (những dòng không xóa)
-                        to_update = edited[edited['Xóa']==False]
+                        # Sửa
+                        to_upd = edited[edited['Xóa']==False]
                         cnt = 0
-                        for i, r in to_update.iterrows():
-                            # Lấy dòng gốc
+                        for i, r in to_upd.iterrows():
                             org = df[df['id']==r['id']].iloc[0]
-                            # So sánh nhanh
                             if (str(r['ngay']) != str(org['ngay']) or r['muc'] != org['muc'] or 
                                 r['so_tien'] != org['so_tien'] or r['loai'] != org['loai'] or 
                                 r['phan_loai'] != org['phan_loai'] or r['trang_thai'] != org['trang_thai'] or 
@@ -363,7 +383,6 @@ def main_app():
             if st.button("Xóa mục"): del_cat(d); st.rerun()
         
         st.divider()
-        # Nút Logout
         if st.button("🔒 ĐĂNG XUẤT KHỎI THIẾT BỊ", type="primary", use_container_width=True):
             st.session_state.logged_in = False
             st.rerun()
