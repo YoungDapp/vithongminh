@@ -118,39 +118,40 @@ def calculate_kpis(df):
     pct_exp = ((exp - last_exp)/last_exp)*100 if last_exp > 0 else (100 if exp > 0 else 0)
     return inc, exp, bal, pct_inc, pct_exp
 
-# --- 4. HỆ THỐNG ĐĂNG NHẬP (FIXED FOR MOBILE) ---
+# --- 4. HỆ THỐNG ĐĂNG NHẬP (1 HÀNG NGANG 0-9) ---
 def login_system():
     if "logged_in" not in st.session_state: st.session_state.logged_in = False
     if st.session_state.logged_in: return True
     if "pin_buffer" not in st.session_state: st.session_state.pin_buffer = ""
 
-    # CSS RIÊNG CHO MÀN HÌNH LOGIN
+    # CSS HẠT NHÂN: Ép buộc hiển thị ngang trên mobile
     st.markdown("""
     <style>
         /* Ẩn Sidebar ở màn hình login */
         [data-testid="stSidebar"] { display: none; }
         
-        .login-container { max-width: 400px; margin: 0 auto; text-align: center; padding-top: 40px; }
+        .login-container { max-width: 500px; margin: 0 auto; text-align: center; padding-top: 40px; }
         
-        /* Ép độ rộng cột để KHÔNG BỊ XUỐNG DÒNG */
+        /* Ép độ rộng cột 10% để xếp đủ 10 số trên 1 hàng */
         div[data-testid="column"] {
             min-width: 0px !important;
-            width: 20% !important; /* 5 cột -> mỗi cột 20% */
-            flex: 0 0 20% !important;
-            padding: 2px !important;
+            width: 10% !important; 
+            flex: 0 0 10% !important;
+            padding: 1px !important;
         }
         
-        /* Style Nút bấm đơn giản */
+        /* Style Nút bấm: Không màu mè */
         .keypad-row div.stButton > button {
             width: 100% !important;
-            height: 50px !important;
-            font-size: 20px !important;
+            height: 45px !important;
+            font-size: 16px !important;
             font-weight: bold !important;
-            border-radius: 8px !important;
-            border: 1px solid #444 !important;
-            background-color: #2d2d2d !important;
+            border-radius: 4px !important;
+            border: 1px solid #555 !important;
+            background-color: #222 !important;
             color: white !important;
             margin: 0 !important;
+            padding: 0 !important;
             box-shadow: none !important;
         }
         .keypad-row div.stButton > button:active {
@@ -159,7 +160,7 @@ def login_system():
         }
         
         .pin-display {
-            font-family: monospace; font-size: 32px; letter-spacing: 10px; color: #00f2c3; margin-bottom: 20px;
+            font-family: monospace; font-size: 40px; letter-spacing: 15px; color: #00f2c3; margin-bottom: 30px;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -188,28 +189,17 @@ def login_system():
     def clr(): st.session_state.pin_buffer = ""
     def bck(): st.session_state.pin_buffer = st.session_state.pin_buffer[:-1]
 
-    # BÀN PHÍM SỐ (2 HÀNG) - DÙNG CONTAINER CSS
+    # BÀN PHÍM SỐ (1 HÀNG NGANG DUY NHẤT 0-9)
     st.markdown('<div class="keypad-row">', unsafe_allow_html=True)
     
-    # Hàng 1: 0-4
-    c0, c1, c2, c3, c4 = st.columns(5)
-    with c0: st.button("0", on_click=press, args="0", key="k0", use_container_width=True)
-    with c1: st.button("1", on_click=press, args="1", key="k1", use_container_width=True)
-    with c2: st.button("2", on_click=press, args="2", key="k2", use_container_width=True)
-    with c3: st.button("3", on_click=press, args="3", key="k3", use_container_width=True)
-    with c4: st.button("4", on_click=press, args="4", key="k4", use_container_width=True)
-
-    # Hàng 2: 5-9
-    c5, c6, c7, c8, c9 = st.columns(5)
-    with c5: st.button("5", on_click=press, args="5", key="k5", use_container_width=True)
-    with c6: st.button("6", on_click=press, args="6", key="k6", use_container_width=True)
-    with c7: st.button("7", on_click=press, args="7", key="k7", use_container_width=True)
-    with c8: st.button("8", on_click=press, args="8", key="k8", use_container_width=True)
-    with c9: st.button("9", on_click=press, args="9", key="k9", use_container_width=True)
+    cols = st.columns(10)
+    for i in range(10):
+        with cols[i]: 
+            st.button(str(i), on_click=press, args=str(i), key=f"k{i}", use_container_width=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Hàng chức năng
+    # Hàng chức năng phụ bên dưới
     st.markdown("<br>", unsafe_allow_html=True)
     b1, b2, b3 = st.columns([1,2,1])
     with b1: st.button("⬅️", on_click=bck, use_container_width=True)
