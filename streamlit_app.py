@@ -215,25 +215,38 @@ def main_app():
     if 'w_debt' not in st.session_state: st.session_state.w_debt = False
 
     def save_callback():
-        opt = st.session_state.w_opt
-        desc = st.session_state.w_desc
-        amt = st.session_state.w_amt
+        # Lấy dữ liệu an toàn bằng .get() để tránh lỗi widget bị ẩn
+        opt = st.session_state.get("w_opt", "")
+        desc = st.session_state.get("w_desc", "")
+        amt = st.session_state.get("w_amt", 0)
+        
         final = desc if opt == "➕ Mới..." else opt
         
+        # Lấy các giá trị khác (an toàn)
+        w_type = st.session_state.get("w_type", "Chi")
+        w_cat = st.session_state.get("w_cat", "Khác")
+        w_debt = st.session_state.get("w_debt", False)
+        w_date = st.session_state.get("w_date", None)
+        w_note = st.session_state.get("w_note", "")
+
         if amt > 0 and final:
             row = {
                 "ngay": str(datetime.datetime.now()), "muc": final, "so_tien": amt,
-                "loai": "Thu" if "Thu" in st.session_state.w_type else "Chi",
-                "phan_loai": st.session_state.w_cat,
-                "han_tra": str(st.session_state.w_date) if st.session_state.w_debt else None,
-                "trang_thai": "Đang nợ" if st.session_state.w_debt else "Đã xong",
-                "ghi_chu": st.session_state.w_note
+                "loai": "Thu" if "Thu" in w_type else "Chi",
+                "phan_loai": w_cat,
+                "han_tra": str(w_date) if w_debt else None,
+                "trang_thai": "Đang nợ" if w_debt else "Đã xong",
+                "ghi_chu": w_note
             }
             add_trans(row)
             st.toast("Đã lưu!", icon="✨")
-            # Reset Form
-            st.session_state.w_amt = 0; st.session_state.w_desc = ""; st.session_state.w_note = ""
-            st.session_state.w_debt = False; st.session_state.w_opt = "➕ Mới..."
+            
+            # Reset Form an toàn
+            st.session_state.w_amt = 0
+            if "w_desc" in st.session_state: st.session_state.w_desc = ""
+            if "w_note" in st.session_state: st.session_state.w_note = ""
+            if "w_debt" in st.session_state: st.session_state.w_debt = False
+            st.session_state.w_opt = "➕ Mới..."
         else: st.toast("Thiếu thông tin!", icon="⚠️")
 
     with st.sidebar:
