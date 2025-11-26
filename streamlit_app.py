@@ -18,7 +18,7 @@ except Exception as e:
     st.error("❌ Thiếu cấu hình Supabase!")
     st.stop()
 
-# --- 2. CSS CAO CẤP ---
+# --- 2. CSS CAO CẤP (V13 NEON PRO - ĐÃ KHÔI PHỤC ĐẦY ĐỦ) ---
 def load_css():
     st.markdown("""
     <style>
@@ -41,13 +41,30 @@ def load_css():
             color: #fff;
         }
 
-        /* Metric Cards */
-        div[data-testid="stMetric"] {
-            background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(0, 242, 195, 0.3);
-            border-radius: 12px; padding: 10px;
+        /* --- CUSTOM METRIC CARDS (KHÔI PHỤC HIỆU ỨNG NEON) --- */
+        .metric-card {
+            background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px);
+            border-radius: 16px; padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.2s;
+            margin-bottom: 10px;
         }
-        div[data-testid="stMetricLabel"] label { color: #aaa !important; }
-        div[data-testid="stMetricValue"] { color: #00f2c3 !important; text-shadow: 0 0 10px rgba(0, 242, 195, 0.4); }
+        .metric-card:hover { transform: translateY(-3px); }
+        
+        .card-income { border-bottom: 3px solid #00f2c3; box-shadow: 0 5px 20px -10px rgba(0, 242, 195, 0.2); }
+        .card-expense { border-bottom: 3px solid #ff4b4b; box-shadow: 0 5px 20px -10px rgba(255, 75, 75, 0.2); }
+        .card-balance { border-bottom: 3px solid #7000ff; box-shadow: 0 5px 20px -10px rgba(112, 0, 255, 0.2); }
+
+        .metric-label { font-size: 0.85rem; color: #ccc; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .metric-value { font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
+        .metric-delta { font-size: 0.8rem; font-weight: 500; padding: 2px 8px; border-radius: 8px; display: inline-block; }
+        
+        /* Text Colors */
+        .text-green { color: #00f2c3 !important; text-shadow: 0 0 15px rgba(0, 242, 195, 0.3); }
+        .text-red { color: #ff4b4b !important; text-shadow: 0 0 15px rgba(255, 75, 75, 0.3); }
+        .text-purple { color: #a742ff !important; text-shadow: 0 0 15px rgba(167, 66, 255, 0.3); }
+        .bg-green-soft { background: rgba(0, 242, 195, 0.15); color: #00f2c3; }
+        .bg-red-soft { background: rgba(255, 75, 75, 0.15); color: #ff4b4b; }
 
         /* Button Style */
         div.stButton > button {
