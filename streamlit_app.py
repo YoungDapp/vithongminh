@@ -18,11 +18,10 @@ except Exception as e:
     st.error("❌ Thiếu cấu hình Supabase!")
     st.stop()
 
-# --- 2. CSS CAO CẤP (GIỮ UI ĐẸP BÊN TRONG) ---
+# --- 2. CSS CHUNG (CHO BÊN TRONG APP) ---
 def load_css():
     st.markdown("""
     <style>
-        /* Font & Nền */
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap');
         .stApp {
             background: radial-gradient(circle at 10% 20%, #1a1c29 0%, #0f0c29 90%);
@@ -49,20 +48,6 @@ def load_css():
         div[data-testid="stMetricLabel"] label { color: #aaa !important; }
         div[data-testid="stMetricValue"] { color: #00f2c3 !important; text-shadow: 0 0 10px rgba(0, 242, 195, 0.4); }
 
-        /* Button Style Chung (Cho bên trong App) */
-        div.stButton > button {
-            width: 100%; border-radius: 12px; font-weight: 600;
-            border: 1px solid #00f2c3; background: rgba(255, 255, 255, 0.05);
-            color: #00f2c3; transition: all 0.2s; padding: 0.5rem 1rem;
-        }
-        div.stButton > button:hover {
-            background: rgba(0, 242, 195, 0.1); box-shadow: 0 0 15px rgba(0, 242, 195, 0.3);
-        }
-        div.stButton > button:active { background: #00f2c3; color: #000; }
-        
-        /* Logout Button */
-        div.stButton > button.logout-btn { border-color: #ff4b4b !important; color: #ff4b4b !important; }
-
         /* Inputs & Editor */
         .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div, [data-testid="stDataEditor"] {
             background-color: rgba(0, 0, 0, 0.3) !important; color: #fff !important;
@@ -83,11 +68,7 @@ def load_css():
 load_css()
 
 # --- 3. DATABASE & LOGIC ---
-COLOR_PALETTE = [
-    "#00f2c3", "#ff4b4b", "#f7b731", "#a55eea", "#4b7bec", 
-    "#fa8231", "#2bcbba", "#eb3b5a", "#3867d6", "#8854d0",
-    "#20bf6b", "#0fb9b1", "#45aaf2", "#fd9644", "#fc5c65"
-]
+COLOR_PALETTE = ["#00f2c3", "#ff4b4b", "#f7b731", "#a55eea", "#4b7bec", "#fa8231", "#2bcbba", "#eb3b5a", "#3867d6", "#8854d0"]
 
 # @st.cache_data(ttl=30)
 def load_data():
@@ -97,8 +78,7 @@ def load_data():
         if not df.empty:
             df['ngay'] = pd.to_datetime(df['ngay'])
             df['han_tra'] = pd.to_datetime(df['han_tra'], errors='coerce').dt.date
-            if 'phuong_thuc' not in df.columns:
-                df['phuong_thuc'] = "Ví tiền mặt"
+            if 'phuong_thuc' not in df.columns: df['phuong_thuc'] = "Ví tiền mặt"
         else:
             df = pd.DataFrame(columns=['id', 'ngay', 'muc', 'so_tien', 'loai', 'phan_loai', 'phuong_thuc', 'han_tra', 'trang_thai', 'ghi_chu'])
         
@@ -138,45 +118,49 @@ def calculate_kpis(df):
     pct_exp = ((exp - last_exp)/last_exp)*100 if last_exp > 0 else (100 if exp > 0 else 0)
     return inc, exp, bal, pct_inc, pct_exp
 
-# --- 4. HỆ THỐNG ĐĂNG NHẬP (FIX MOBILE STACKING) ---
+# --- 4. HỆ THỐNG ĐĂNG NHẬP (FIXED FOR MOBILE) ---
 def login_system():
     if "logged_in" not in st.session_state: st.session_state.logged_in = False
     if st.session_state.logged_in: return True
     if "pin_buffer" not in st.session_state: st.session_state.pin_buffer = ""
 
-    # CSS HẠT NHÂN: Ép buộc hiển thị ngang trên mobile
+    # CSS RIÊNG CHO MÀN HÌNH LOGIN
     st.markdown("""
     <style>
-        /* Ẩn Sidebar ở màn hình login cho gọn */
+        /* Ẩn Sidebar ở màn hình login */
         [data-testid="stSidebar"] { display: none; }
         
-        /* Căn giữa Login Box */
-        .login-box { max-width: 380px; margin: 0 auto; text-align: center; padding-top: 50px; }
+        .login-container { max-width: 400px; margin: 0 auto; text-align: center; padding-top: 40px; }
         
-        /* Ép các cột st.columns KHÔNG được xuống dòng */
+        /* Ép độ rộng cột để KHÔNG BỊ XUỐNG DÒNG */
         div[data-testid="column"] {
-            display: flex !important;
-            flex: 1 1 auto !important;
-            min-width: 0px !important; /* Quan trọng nhất */
+            min-width: 0px !important;
+            width: 20% !important; /* 5 cột -> mỗi cột 20% */
+            flex: 0 0 20% !important;
             padding: 2px !important;
         }
         
-        /* Style nút bấm bàn phím: ĐƠN GIẢN, RÕ RÀNG */
+        /* Style Nút bấm đơn giản */
         .keypad-row div.stButton > button {
-            border-radius: 8px !important;
-            border: 1px solid #333 !important;
-            background-color: #222 !important;
-            color: #fff !important;
+            width: 100% !important;
             height: 50px !important;
             font-size: 20px !important;
+            font-weight: bold !important;
+            border-radius: 8px !important;
+            border: 1px solid #444 !important;
+            background-color: #2d2d2d !important;
+            color: white !important;
             margin: 0 !important;
-            box-shadow: none !important; /* Bỏ hiệu ứng neon */
+            box-shadow: none !important;
         }
         .keypad-row div.stButton > button:active {
-            background-color: #444 !important;
+            background-color: #00f2c3 !important;
+            color: black !important;
         }
         
-        .pin-dots { font-size: 40px; letter-spacing: 10px; color: #00f2c3; margin-bottom: 20px; font-family: monospace; }
+        .pin-display {
+            font-family: monospace; font-size: 32px; letter-spacing: 10px; color: #00f2c3; margin-bottom: 20px;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -188,24 +172,23 @@ def login_system():
     def set_pin(v): supabase.table('app_config').upsert({"key": "user_pin", "value": v}).execute()
     stored = get_pin()
 
-    # Giao diện Login
-    st.markdown("<div class='login-box'>", unsafe_allow_html=True)
+    # GIAO DIỆN CHÍNH
+    st.markdown("<div class='login-container'>", unsafe_allow_html=True)
     st.markdown("<h1>🔒 SmartWallet</h1>", unsafe_allow_html=True)
     
-    # Hiển thị PIN (Dạng ẩn)
-    pin_len = len(st.session_state.pin_buffer)
-    mask = "●" * pin_len + "_" * (4 - pin_len)
-    st.markdown(f"<div class='pin-dots'>{mask}</div>", unsafe_allow_html=True)
+    # PIN Mask
+    plen = len(st.session_state.pin_buffer)
+    mask = "●" * plen + "_" * (4 - plen)
+    st.markdown(f"<div class='pin-display'>{mask}</div>", unsafe_allow_html=True)
 
-    if stored is None: st.info("🆕 Nhập 4 số để tạo PIN")
+    if stored is None: st.info("🆕 Tạo PIN mới")
 
     def press(v): 
         if len(st.session_state.pin_buffer) < 4: st.session_state.pin_buffer += v
     def clr(): st.session_state.pin_buffer = ""
     def bck(): st.session_state.pin_buffer = st.session_state.pin_buffer[:-1]
 
-    # BÀN PHÍM SỐ - 2 HÀNG NGANG
-    # Container class để áp dụng CSS riêng
+    # BÀN PHÍM SỐ (2 HÀNG) - DÙNG CONTAINER CSS
     st.markdown('<div class="keypad-row">', unsafe_allow_html=True)
     
     # Hàng 1: 0-4
@@ -232,6 +215,8 @@ def login_system():
     with b1: st.button("⬅️", on_click=bck, use_container_width=True)
     with b2:
         if len(st.session_state.pin_buffer) == 4:
+            # Style riêng cho nút chính
+            st.markdown("""<style>div.stButton > button[kind="primary"] { border: 1px solid #00f2c3 !important; }</style>""", unsafe_allow_html=True)
             if stored is None:
                 if st.button("💾 LƯU PIN", type="primary", use_container_width=True):
                     set_pin(st.session_state.pin_buffer)
@@ -259,7 +244,6 @@ def main_app():
     if 'w_note' not in st.session_state: st.session_state.w_note = ""
     if 'w_debt' not in st.session_state: st.session_state.w_debt = False
     
-    # Nhớ phương thức
     if 'last_method' not in st.session_state:
         st.session_state.last_method = methods[0] if methods else "Ví tiền mặt"
 
