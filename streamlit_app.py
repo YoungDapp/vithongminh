@@ -18,7 +18,7 @@ except Exception as e:
     st.error("❌ Thiếu cấu hình Supabase!")
     st.stop()
 
-# --- 2. CSS CAO CẤP (V13 NEON PRO) ---
+# --- 2. CSS CAO CẤP ---
 def load_css():
     st.markdown("""
     <style>
@@ -33,36 +33,23 @@ def load_css():
 
         /* Container Kính Mờ */
         div[data-testid="stVerticalBlock"] > div.stContainer, 
-        section[data-testid="stSidebar"] {
+        section[data-testid="stSidebar"],
+        .streamlit-expanderHeader {
             background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px;
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+            color: #fff;
         }
 
-        /* --- CUSTOM METRIC CARDS (THẺ CHỈ SỐ PRO) --- */
-        .metric-card {
-            background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px);
-            border-radius: 16px; padding: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: transform 0.2s;
+        /* Metric Cards */
+        div[data-testid="stMetric"] {
+            background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(0, 242, 195, 0.3);
+            border-radius: 12px; padding: 10px;
         }
-        .metric-card:hover { transform: translateY(-3px); }
-        
-        .card-income { border-bottom: 3px solid #00f2c3; box-shadow: 0 5px 20px -10px rgba(0, 242, 195, 0.2); }
-        .card-expense { border-bottom: 3px solid #ff4b4b; box-shadow: 0 5px 20px -10px rgba(255, 75, 75, 0.2); }
-        .card-balance { border-bottom: 3px solid #7000ff; box-shadow: 0 5px 20px -10px rgba(112, 0, 255, 0.2); }
+        div[data-testid="stMetricLabel"] label { color: #aaa !important; }
+        div[data-testid="stMetricValue"] { color: #00f2c3 !important; text-shadow: 0 0 10px rgba(0, 242, 195, 0.4); }
 
-        .metric-label { font-size: 0.85rem; color: #ccc; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
-        .metric-value { font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
-        .metric-delta { font-size: 0.8rem; font-weight: 500; padding: 2px 8px; border-radius: 8px; display: inline-block; }
-        
-        .text-green { color: #00f2c3; text-shadow: 0 0 15px rgba(0, 242, 195, 0.3); }
-        .text-red { color: #ff4b4b; text-shadow: 0 0 15px rgba(255, 75, 75, 0.3); }
-        .text-purple { color: #a742ff; text-shadow: 0 0 15px rgba(167, 66, 255, 0.3); }
-        .bg-green-soft { background: rgba(0, 242, 195, 0.15); color: #00f2c3; }
-        .bg-red-soft { background: rgba(255, 75, 75, 0.15); color: #ff4b4b; }
-
-        /* Button Style (Pill Shape) */
+        /* Button Style */
         div.stButton > button {
             width: 100%; border-radius: 12px; font-weight: 600;
             border: 1px solid #00f2c3; background: rgba(255, 255, 255, 0.05);
@@ -82,7 +69,7 @@ def load_css():
             border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 8px !important;
         }
         
-        /* Tabs (Pill Shape) */
+        /* Tabs */
         .stTabs [data-baseweb="tab-list"] { 
             gap: 8px; background: rgba(255,255,255,0.05); padding: 6px; border-radius: 30px; justify-content: center; 
         }
@@ -101,6 +88,13 @@ def load_css():
 load_css()
 
 # --- 3. DATABASE & LOGIC ---
+# BẢNG MÀU CỐ ĐỊNH (Để đồng bộ giữa Biểu đồ và Danh sách)
+COLOR_PALETTE = [
+    "#00f2c3", "#ff4b4b", "#f7b731", "#a55eea", "#4b7bec", 
+    "#fa8231", "#2bcbba", "#eb3b5a", "#3867d6", "#8854d0",
+    "#20bf6b", "#0fb9b1", "#45aaf2", "#fd9644", "#fc5c65"
+]
+
 # @st.cache_data(ttl=30)
 def load_data():
     try:
@@ -123,7 +117,7 @@ def del_trans_list(ids): supabase.table('transactions').delete().in_('id', ids).
 def add_cat(n): supabase.table('categories').insert({"ten_danh_muc": n}).execute()
 def del_cat(n): supabase.table('categories').delete().eq('ten_danh_muc', n).execute()
 
-# Hàm tính toán KPI (% Tăng trưởng)
+# Hàm tính toán KPI
 def calculate_kpis(df):
     if df.empty: return 0, 0, 0, 0, 0
     today = pd.Timestamp.now()
@@ -138,7 +132,6 @@ def calculate_kpis(df):
     last_inc = last_m[last_m['loai']=='Thu']['so_tien'].sum()
     last_exp = last_m[last_m['loai']=='Chi']['so_tien'].sum()
     
-    # Tránh chia cho 0
     pct_inc = ((inc - last_inc)/last_inc)*100 if last_inc > 0 else (100 if inc > 0 else 0)
     pct_exp = ((exp - last_exp)/last_exp)*100 if last_exp > 0 else (100 if exp > 0 else 0)
     return inc, exp, bal, pct_inc, pct_exp
@@ -215,14 +208,13 @@ def main_app():
     if 'w_debt' not in st.session_state: st.session_state.w_debt = False
 
     def save_callback():
-        # Lấy dữ liệu an toàn bằng .get() để tránh lỗi widget bị ẩn
+        # Lấy dữ liệu an toàn
         opt = st.session_state.get("w_opt", "")
         desc = st.session_state.get("w_desc", "")
         amt = st.session_state.get("w_amt", 0)
         
         final = desc if opt == "➕ Mới..." else opt
         
-        # Lấy các giá trị khác (an toàn)
         w_type = st.session_state.get("w_type", "Chi")
         w_cat = st.session_state.get("w_cat", "Khác")
         w_debt = st.session_state.get("w_debt", False)
@@ -241,7 +233,7 @@ def main_app():
             add_trans(row)
             st.toast("Đã lưu!", icon="✨")
             
-            # Reset Form an toàn
+            # Reset Form
             st.session_state.w_amt = 0
             if "w_desc" in st.session_state: st.session_state.w_desc = ""
             if "w_note" in st.session_state: st.session_state.w_note = ""
@@ -257,13 +249,13 @@ def main_app():
     tab1, tab2, tab3 = st.tabs(["📊 TỔNG QUAN", "⏳ SỔ NỢ", "⚙️ CÀI ĐẶT"])
 
     with tab1:
-        # --- PHẦN 1: THẺ CHỈ SỐ CUSTOM (V13) ---
+        # --- PHẦN 1: KPI CARDS ---
         inc, exp, bal, pi, pe = calculate_kpis(df)
         
         ci = "text-green" if pi>=0 else "text-red"
         icon_i = "↗" if pi>=0 else "↘"
         
-        ce = "text-red" if pe>=0 else "text-green" # Chi tăng là xấu (Đỏ)
+        ce = "text-red" if pe>=0 else "text-green"
         icon_e = "↗" if pe>=0 else "↘"
         
         c1, c2, c3 = st.columns(3)
@@ -295,63 +287,60 @@ def main_app():
             with st.container():
                 st.subheader("📊 Phân Tích")
                 if not df.empty:
-                    # --- TABS CON: CHI TIÊU vs THU NHẬP ---
                     tab_chi, tab_thu = st.tabs(["📉 Chi Tiêu", "📈 Thu Nhập"])
                     
-                    # 1. BIỂU ĐỒ CHI TIÊU (Đỏ/Cam)
-                    with tab_chi:
-                        exp_df = df[(df['loai']=='Chi') & (df['phan_loai']!='Cho vay')]
-                        if not exp_df.empty:
-                            chart_data = exp_df.groupby('phan_loai')['so_tien'].sum().reset_index()
+                    # Hàm vẽ biểu đồ đồng bộ màu sắc
+                    def draw_chart(sub_df, color_scheme):
+                        if not sub_df.empty:
+                            chart_data = sub_df.groupby('phan_loai')['so_tien'].sum().reset_index()
+                            
+                            # TẠO BẢNG MÀU ĐỒNG BỘ (COLOR MATCHING)
+                            unique_cats = chart_data['phan_loai'].unique()
+                            # Gán mỗi danh mục 1 màu cố định từ bảng màu
+                            color_map = {cat: COLOR_PALETTE[i % len(COLOR_PALETTE)] for i, cat in enumerate(unique_cats)}
+                            
                             base = alt.Chart(chart_data).encode(theta=alt.Theta("so_tien", stack=True))
                             pie = base.mark_arc(innerRadius=65, outerRadius=100, cornerRadius=5).encode(
-                                color=alt.Color("phan_loai", scale=alt.Scale(scheme='turbo'), legend=None), # Màu rực rỡ
+                                color=alt.Color("phan_loai", scale=alt.Scale(domain=list(color_map.keys()), range=list(color_map.values())), legend=None),
                                 order=alt.Order("so_tien", sort="descending"), tooltip=["phan_loai", "so_tien"]
                             )
-                            text = base.mark_text(radius=120, fill="#ff4b4b").encode(text=alt.Text("so_tien", format=",.0f"), order=alt.Order("so_tien", sort="descending"))
+                            text = base.mark_text(radius=120, fill="#fff").encode(text=alt.Text("so_tien", format=",.0f"), order=alt.Order("so_tien", sort="descending"))
                             st.altair_chart((pie + text).properties(background='transparent'), use_container_width=True)
                             
-                            # List chi tiết
+                            # DANH SÁCH LIST ĐỒNG BỘ MÀU
                             for _, row in chart_data.sort_values('so_tien', ascending=False).iterrows():
-                                st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05)'><span style='color:#ddd'>▫️ {row['phan_loai']}</span><span style='color:#ff4b4b; font-weight:bold'>{row['so_tien']:,.0f}</span></div>", unsafe_allow_html=True)
-                        else: st.info("Chưa có dữ liệu chi.")
+                                cat_color = color_map[row['phan_loai']]
+                                st.markdown(f"""
+                                <div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05)">
+                                    <span style="color:{cat_color}; font-weight:500">▫️ {row['phan_loai']}</span>
+                                    <span style="color:#fff; font-weight:bold">{row['so_tien']:,.0f}</span>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        else: st.info("Chưa có dữ liệu.")
 
-                    # 2. BIỂU ĐỒ THU NHẬP (Xanh Lá)
+                    with tab_chi:
+                        # Không lọc 'Cho vay' nữa để thấy hết
+                        draw_chart(df[df['loai']=='Chi'], 'turbo')
+                    
                     with tab_thu:
-                        inc_df = df[(df['loai']=='Thu') & (df['phan_loai']!='Đi vay')]
-                        if not inc_df.empty:
-                            chart_data_inc = inc_df.groupby('phan_loai')['so_tien'].sum().reset_index()
-                            base_inc = alt.Chart(chart_data_inc).encode(theta=alt.Theta("so_tien", stack=True))
-                            pie_inc = base_inc.mark_arc(innerRadius=65, outerRadius=100, cornerRadius=5).encode(
-                                color=alt.Color("phan_loai", scale=alt.Scale(scheme='greens'), legend=None), # Màu xanh
-                                order=alt.Order("so_tien", sort="descending"), tooltip=["phan_loai", "so_tien"]
-                            )
-                            text_inc = base_inc.mark_text(radius=120, fill="#00f2c3").encode(text=alt.Text("so_tien", format=",.0f"), order=alt.Order("so_tien", sort="descending"))
-                            st.altair_chart((pie_inc + text_inc).properties(background='transparent'), use_container_width=True)
-                            
-                            for _, row in chart_data_inc.sort_values('so_tien', ascending=False).iterrows():
-                                st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05)'><span style='color:#ddd'>▫️ {row['phan_loai']}</span><span style='color:#00f2c3; font-weight:bold'>{row['so_tien']:,.0f}</span></div>", unsafe_allow_html=True)
-                        else: st.info("Chưa có dữ liệu thu.")
+                        # Không lọc 'Đi vay' nữa để thấy hết
+                        draw_chart(df[df['loai']=='Thu'], 'greens')
 
                 else: st.info("Trống.")
 
         st.divider()
         
-        # --- PHẦN 3: SMART HISTORY (V14) ---
-        with st.container():
-            st.subheader("📅 Lịch sử & Chỉnh sửa")
+        # --- PHẦN 3: SMART HISTORY (DẠNG EXPANDER - THU GỌN) ---
+        with st.expander("📅 Lịch sử & Chỉnh sửa (Click để xem)", expanded=False):
             if not df.empty:
                 c_d, c_v = st.columns([1,2])
                 with c_d: f_date = st.date_input("Chọn ngày:", date.today())
                 with c_v: view = st.radio("Chế độ xem:", ["Chỉ ngày này", "Tất cả"], horizontal=True)
                 
-                # Lọc
                 df_show = df[df['ngay'].dt.date == f_date].copy() if view == "Chỉ ngày này" else df.copy()
                 
                 if not df_show.empty:
                     df_show['Xóa'] = False 
-                    
-                    # Bảng Edit
                     edited = st.data_editor(
                         df_show,
                         column_config={
@@ -367,7 +356,6 @@ def main_app():
                         use_container_width=True, hide_index=True, key="history_edit"
                     )
                     
-                    # Nút Lưu Thay Đổi
                     if st.button("💾 CẬP NHẬT THAY ĐỔI", type="primary", use_container_width=True):
                         # Xóa
                         to_del = edited[edited['Xóa']==True]['id'].tolist()
