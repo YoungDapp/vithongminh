@@ -295,23 +295,44 @@ def main_app():
             with st.container():
                 st.subheader("📊 Phân Tích")
                 if not df.empty:
-                    exp_df = df[(df['loai']=='Chi') & (df['phan_loai']!='Cho vay')]
-                    if not exp_df.empty:
-                        chart_data = exp_df.groupby('phan_loai')['so_tien'].sum().reset_index()
-                        
-                        # Chart trong suốt (V13)
-                        base = alt.Chart(chart_data).encode(theta=alt.Theta("so_tien", stack=True))
-                        pie = base.mark_arc(innerRadius=65, outerRadius=100, cornerRadius=5).encode(
-                            color=alt.Color("phan_loai", scale=alt.Scale(scheme='turbo'), legend=None),
-                            order=alt.Order("so_tien", sort="descending"), tooltip=["phan_loai", "so_tien"]
-                        )
-                        text = base.mark_text(radius=120, fill="#00f2c3").encode(text=alt.Text("so_tien", format=",.0f"), order=alt.Order("so_tien", sort="descending"))
-                        st.altair_chart((pie + text).properties(background='transparent'), use_container_width=True)
-                        
-                        # List chi tiết
-                        for _, row in chart_data.sort_values('so_tien', ascending=False).iterrows():
-                            st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05)'><span style='color:#ddd'>▫️ {row['phan_loai']}</span><span style='color:#00f2c3; font-weight:bold'>{row['so_tien']:,.0f}</span></div>", unsafe_allow_html=True)
-                    else: st.info("Chưa có dữ liệu chi.")
+                    # --- TABS CON: CHI TIÊU vs THU NHẬP ---
+                    tab_chi, tab_thu = st.tabs(["📉 Chi Tiêu", "📈 Thu Nhập"])
+                    
+                    # 1. BIỂU ĐỒ CHI TIÊU (Đỏ/Cam)
+                    with tab_chi:
+                        exp_df = df[(df['loai']=='Chi') & (df['phan_loai']!='Cho vay')]
+                        if not exp_df.empty:
+                            chart_data = exp_df.groupby('phan_loai')['so_tien'].sum().reset_index()
+                            base = alt.Chart(chart_data).encode(theta=alt.Theta("so_tien", stack=True))
+                            pie = base.mark_arc(innerRadius=65, outerRadius=100, cornerRadius=5).encode(
+                                color=alt.Color("phan_loai", scale=alt.Scale(scheme='turbo'), legend=None), # Màu rực rỡ
+                                order=alt.Order("so_tien", sort="descending"), tooltip=["phan_loai", "so_tien"]
+                            )
+                            text = base.mark_text(radius=120, fill="#ff4b4b").encode(text=alt.Text("so_tien", format=",.0f"), order=alt.Order("so_tien", sort="descending"))
+                            st.altair_chart((pie + text).properties(background='transparent'), use_container_width=True)
+                            
+                            # List chi tiết
+                            for _, row in chart_data.sort_values('so_tien', ascending=False).iterrows():
+                                st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05)'><span style='color:#ddd'>▫️ {row['phan_loai']}</span><span style='color:#ff4b4b; font-weight:bold'>{row['so_tien']:,.0f}</span></div>", unsafe_allow_html=True)
+                        else: st.info("Chưa có dữ liệu chi.")
+
+                    # 2. BIỂU ĐỒ THU NHẬP (Xanh Lá)
+                    with tab_thu:
+                        inc_df = df[(df['loai']=='Thu') & (df['phan_loai']!='Đi vay')]
+                        if not inc_df.empty:
+                            chart_data_inc = inc_df.groupby('phan_loai')['so_tien'].sum().reset_index()
+                            base_inc = alt.Chart(chart_data_inc).encode(theta=alt.Theta("so_tien", stack=True))
+                            pie_inc = base_inc.mark_arc(innerRadius=65, outerRadius=100, cornerRadius=5).encode(
+                                color=alt.Color("phan_loai", scale=alt.Scale(scheme='greens'), legend=None), # Màu xanh
+                                order=alt.Order("so_tien", sort="descending"), tooltip=["phan_loai", "so_tien"]
+                            )
+                            text_inc = base_inc.mark_text(radius=120, fill="#00f2c3").encode(text=alt.Text("so_tien", format=",.0f"), order=alt.Order("so_tien", sort="descending"))
+                            st.altair_chart((pie_inc + text_inc).properties(background='transparent'), use_container_width=True)
+                            
+                            for _, row in chart_data_inc.sort_values('so_tien', ascending=False).iterrows():
+                                st.markdown(f"<div style='display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.05)'><span style='color:#ddd'>▫️ {row['phan_loai']}</span><span style='color:#00f2c3; font-weight:bold'>{row['so_tien']:,.0f}</span></div>", unsafe_allow_html=True)
+                        else: st.info("Chưa có dữ liệu thu.")
+
                 else: st.info("Trống.")
 
         st.divider()
