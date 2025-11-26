@@ -227,36 +227,70 @@ def delete_category_db(cat_name):
     except:
         return False
 
-# --- 5. HỆ THỐNG BẢO MẬT (GIỮ NGUYÊN LOCAL PIN) ---
+# --- 5. HỆ THỐNG BẢO MẬT (ĐÃ FIX LỖI GOOGLE SUGGEST) ---
 CONFIG_FILE = "config.json"
+
 def login_system():
-    if "logged_in" not in st.session_state: st.session_state.logged_in = False
-    if st.session_state.logged_in: return True
+    # Kiểm tra trạng thái đăng nhập
+    if "logged_in" not in st.session_state: 
+        st.session_state.logged_in = False
+    
+    # Nếu đã đăng nhập -> Cho qua (Return True)
+    if st.session_state.logged_in: 
+        return True
 
     col1, col2, col3 = st.columns([1,1,1])
     with col2:
-        # Bọc form login vào container kính mờ
+        # Sử dụng container để giữ hiệu ứng kính mờ (Glassmorphism)
         with st.container():
             st.markdown("<br><h1 style='text-align: center;'>🔐 Z-Wallet</h1>", unsafe_allow_html=True)
+            
+            # --- TRƯỜNG HỢP 1: CHƯA CÓ FILE CONFIG (LẦN ĐẦU) ---
             if not os.path.exists(CONFIG_FILE):
                 st.warning("⚡ Setup PIN bảo mật (4 số)")
-                with st.form("setup"):
-                    p1 = st.text_input("PIN mới", type="password", max_chars=4)
-                    if st.form_submit_button("KHỞI TẠO", type="primary"):
-                        if len(p1) == 4 and p1.isdigit():
-                            with open(CONFIG_FILE, "w") as f: json.dump({"pin": p1}, f)
-                            st.rerun()
-                        else: st.error("PIN phải là 4 chữ số!")
+                # Không dùng st.form để tránh trình duyệt hỏi lưu
+                p1 = st.text_input("Tạo PIN mới", type="password", max_chars=4, key="setup_pin")
+                
+                if st.button("KHỞI TẠO", type="primary", use_container_width=True):
+                    if len(p1) == 4 and p1.isdigit():
+                        with open(CONFIG_FILE, "w") as f: json.dump({"pin": p1}, f)
+                        st.session_state.logged_in = True
+                        st.rerun()
+                    else: 
+                        st.error("PIN phải là 4 chữ số!")
+            
+            # --- TRƯỜNG HỢP 2: ĐĂNG NHẬP ---
             else:
-                with st.form("login"):
-                    pin = st.text_input("Nhập PIN để truy cập", type="password", max_chars=4)
-                    if st.form_submit_button("🚀 TRUY CẬP NGAY", type="primary"):
-                        with open(CONFIG_FILE, "r") as f: stored = json.load(f).get("pin")
-                        if pin == stored:
-                            st.session_state.logged_in = True
-                            st.rerun()
-                        else:
-                            st.error("Sai mã PIN!")
+                # Hàm check pin nội bộ
+                def check_pin():
+                    input_val = st.session_state.login_input
+                    with open(CONFIG_FILE, "r") as f: 
+                        stored = json.load(f).get("pin")
+                    
+                    if input_val == stored:
+                        st.session_state.logged_in = True
+                        # Không cần rerun ở đây vì on_change sẽ tự refresh, 
+                        # nhưng thêm vào để đảm bảo chuyển trang mượt
+                    else:
+                        st.toast("❌ Sai mã PIN!", icon="🚫")
+
+                # Ô nhập PIN (Bỏ st.form)
+                # on_change=check_pin: Bấm Enter là tự kiểm tra luôn
+                st.text_input(
+                    "Nhập PIN truy cập", 
+                    type="password", 
+                    max_chars=4, 
+                    key="login_input",
+                    on_change=check_pin 
+                )
+                
+                # Nút bấm phụ trợ (cho ai thích bấm chuột)
+                if st.button("🚀 TRUY CẬP NGAY", type="primary", use_container_width=True):
+                    check_pin()
+                    if st.session_state.logged_in:
+                        st.rerun()
+
+    # Dừng app nếu chưa đăng nhập
     st.stop()
 
 # --- 6. APP CHÍNH (GIAO DIỆN MỚI) ---
