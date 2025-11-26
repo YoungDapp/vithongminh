@@ -114,7 +114,7 @@ def del_trans(tid): supabase.table('transactions').delete().eq('id', tid).execut
 def add_cat(n): supabase.table('categories').insert({"ten_danh_muc": n}).execute()
 def del_cat(n): supabase.table('categories').delete().eq('ten_danh_muc', n).execute()
 
-# --- 4. HỆ THỐNG ĐĂNG NHẬP (Bàn phím 3 cột chuẩn Mobile) ---
+# --- 4. HỆ THỐNG ĐĂNG NHẬP ---
 def login_system():
     if "logged_in" not in st.session_state: st.session_state.logged_in = False
     if st.session_state.logged_in: return True
@@ -198,6 +198,48 @@ def main_app():
     df, cats = load_data()
     st.session_state.categories = cats
 
+    # --- KHỞI TẠO SESSION STATE CHO WIDGET ---
+    if 'w_opt' not in st.session_state: st.session_state.w_opt = "➕ Mới..."
+    if 'w_desc' not in st.session_state: st.session_state.w_desc = ""
+    if 'w_amt' not in st.session_state: st.session_state.w_amt = 0
+    if 'w_note' not in st.session_state: st.session_state.w_note = ""
+    if 'w_debt' not in st.session_state: st.session_state.w_debt = False
+
+    # --- HÀM CALLBACK: LƯU & RESET ---
+    def save_callback():
+        # Lấy dữ liệu từ Session State
+        opt = st.session_state.w_opt
+        desc_input = st.session_state.w_desc
+        amt = st.session_state.w_amt
+        typ = st.session_state.w_type
+        cat = st.session_state.w_cat
+        debt = st.session_state.w_debt
+        ddl = st.session_state.w_date if debt else None
+        note = st.session_state.w_note
+
+        # Xử lý tên
+        final_desc = desc_input if opt == "➕ Mới..." else opt
+
+        if amt > 0 and final_desc:
+            row = {
+                "ngay": str(date.today()), "muc": final_desc, "so_tien": amt,
+                "loai": typ, "phan_loai": cat,
+                "han_tra": str(ddl) if debt else None,
+                "trang_thai": "Đang nợ" if debt else "Đã xong",
+                "ghi_chu": note
+            }
+            add_trans(row)
+            st.toast("Đã lưu thành công!", icon="✅")
+            
+            # RESET FORM TẠI ĐÂY (An toàn vì nằm trong Callback)
+            st.session_state.w_amt = 0
+            st.session_state.w_desc = ""
+            st.session_state.w_note = ""
+            st.session_state.w_debt = False
+            st.session_state.w_opt = "➕ Mới..."
+        else:
+            st.toast("Thiếu thông tin!", icon="⚠️")
+
     with st.sidebar:
         st.title("⚡ Menu")
         if st.button("🔄 Tải lại"): st.cache_data.clear(); st.rerun()
@@ -226,49 +268,27 @@ def main_app():
                 st.subheader("➕ Giao dịch")
                 hist = df['muc'].unique().tolist() if not df.empty else []
                 if hist: hist.reverse()
-                opt = st.selectbox("Nội dung", ["➕ Mới..."] + hist, key="w_opt")
                 
-                # Logic hiển thị ô nhập tên
-                if opt == "➕ Mới...":
-                    desc = st.text_input("Tên mục:", key="w_desc")
-                    final_desc_val = desc
-                else:
-                    final_desc_val = opt
+                # Widget Nhập liệu (Có Key để Reset)
+                st.selectbox("Nội dung", ["➕ Mới..."] + hist, key="w_opt")
                 
-                amt = st.number_input("Số tiền:", step=50000, key="w_amt")
+                if st.session_state.w_opt == "➕ Mới...":
+                    st.text_input("Tên mục:", key="w_desc")
+                
+                st.number_input("Số tiền:", step=50000, key="w_amt")
                 
                 c1, c2 = st.columns(2)
-                with c1: typ = st.radio("Loại:", ["Chi", "Thu"], key="w_type")
-                with c2: cat = st.selectbox("Mục:", st.session_state.categories, key="w_cat")
+                with c1: st.radio("Loại:", ["Chi", "Thu"], key="w_type")
+                with c2: st.selectbox("Mục:", st.session_state.categories, key="w_cat")
                 
-                debt = st.checkbox("Vay/Nợ?", key="w_debt")
-                ddl = st.date_input("Hạn:", key="w_date") if debt else None
-                note = st.text_input("Note:", key="w_note")
+                st.checkbox("Vay/Nợ?", key="w_debt")
+                if st.session_state.w_debt:
+                    st.date_input("Hạn:", key="w_date")
+                
+                st.text_input("Note:", key="w_note")
 
-                # NÚT LƯU + RESET FORM
-                if st.button("LƯU GIAO DỊCH 🚀", type="primary", use_container_width=True):
-                    if amt > 0 and final_desc_val:
-                        row = {
-                            "ngay": str(date.today()), "muc": final_desc_val, "so_tien": amt,
-                            "loai": typ, "phan_loai": cat,
-                            "han_tra": str(ddl) if debt else None,
-                            "trang_thai": "Đang nợ" if debt else "Đã xong",
-                            "ghi_chu": note
-                        }
-                        add_trans(row)
-                        st.toast("Đã lưu thành công!")
-                        
-                        # === RESET FORM ===
-                        st.session_state.w_amt = 0
-                        st.session_state.w_desc = ""
-                        st.session_state.w_note = ""
-                        st.session_state.w_debt = False
-                        st.session_state.w_opt = "➕ Mới..."
-                        
-                        time.sleep(0.5)
-                        st.rerun()
-                    else:
-                        st.toast("Thiếu thông tin!", icon="⚠️")
+                # NÚT GỌI CALLBACK (Không cần Rerun thủ công)
+                st.button("LƯU GIAO DỊCH 🚀", type="primary", on_click=save_callback, use_container_width=True)
 
         # --- CỘT PHẢI: BIỂU ĐỒ ---
         with c_right:
@@ -277,10 +297,9 @@ def main_app():
                 if not df.empty:
                     exp_df = df[(df['loai']=='Chi') & (df['phan_loai']!='Cho vay')]
                     if not exp_df.empty:
-                        # Dữ liệu
                         chart_data = exp_df.groupby('phan_loai')['so_tien'].sum().reset_index()
                         
-                        # 1. Biểu đồ tròn (Transparent Background)
+                        # Biểu đồ trong suốt
                         base = alt.Chart(chart_data).encode(theta=alt.Theta("so_tien", stack=True))
                         pie = base.mark_arc(innerRadius=60, outerRadius=100, cornerRadius=5).encode(
                             color=alt.Color("phan_loai", scale=alt.Scale(scheme='turbo'), legend=None),
@@ -291,15 +310,12 @@ def main_app():
                             text=alt.Text("so_tien", format=",.0f"),
                             order=alt.Order("so_tien", sort="descending")
                         )
-                        # Thêm .configure(background='transparent')
                         final_chart = (pie + text).properties(background='transparent').configure_view(strokeWidth=0)
                         st.altair_chart(final_chart, use_container_width=True)
                         
-                        # 2. Danh sách (Thay thế bảng)
+                        # Danh sách chi tiết
                         st.write("---")
-                        st.caption("Chi tiết:")
                         for idx, row in chart_data.sort_values('so_tien', ascending=False).iterrows():
-                            # Hiển thị dạng list đẹp mắt
                             st.markdown(f"""
                             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 5px 0;">
                                 <span style="color: #ccc;">{row['phan_loai']}</span>
@@ -318,20 +334,17 @@ def main_app():
                 if st.button("Xác nhận xóa"):
                     del_trans(int(del_id)); st.rerun()
 
-    # --- TAB 2: SỔ NỢ (ĐÃ CẢI TIẾN CÂU TỪ) ---
+    # --- TAB 2: SỔ NỢ ---
     with tab2:
         st.subheader("Sổ Nợ")
         if not df.empty:
             d = df[df['trang_thai']=='Đang nợ']
             if not d.empty:
                 for i, r in d.iterrows():
-                    # Logic câu từ rõ ràng
                     if r['loai'] == 'Thu':
-                        # Thu tiền về mà "Đang nợ" => Mình đi vay => Mình nợ họ
                         status_color = "#ff4b4b" # Đỏ
                         title = f"🔴 BẠN ĐANG NỢ: {r['muc']}"
                     else:
-                        # Chi tiền đi mà "Đang nợ" => Mình cho vay => Họ nợ mình
                         status_color = "#00f2c3" # Xanh
                         title = f"🟢 HỌ ĐANG NỢ BẠN: {r['muc']}"
 
