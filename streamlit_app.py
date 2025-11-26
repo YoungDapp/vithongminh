@@ -266,9 +266,7 @@ def main_app():
             }
             add_trans(row)
             
-            # Cập nhật last_method
             st.session_state.last_method = w_method
-            
             st.toast("Đã lưu!", icon="✨")
             
             st.session_state.w_amt = 0
@@ -309,16 +307,15 @@ def main_app():
                 st.selectbox("Nội dung", ["➕ Mới..."] + hist, key="w_opt")
                 if st.session_state.w_opt == "➕ Mới...": st.text_input("Tên mục:", key="w_desc")
                 
-                # --- SỐ TIỀN VỚI FORMATTING PREVIEW ---
-                st.number_input("Số tiền:", step=50000, key="w_amt")
+                # SỐ TIỀN (FORMATTED PREVIEW)
+                st.number_input("Số tiền:", step=50000, format="%d", key="w_amt")
                 if st.session_state.w_amt > 0:
-                    st.caption(f"💡 {st.session_state.w_amt:,.0f} VNĐ") # Preview định dạng số
+                    st.caption(f"👉 Định dạng: **{st.session_state.w_amt:,.0f} VNĐ**")
                 
                 c1, c2 = st.columns(2)
                 with c1: st.radio("Loại:", ["Chi tiền", "Thu tiền"], key="w_type")
                 with c2: st.selectbox("Nhóm:", st.session_state.categories, key="w_cat")
                 
-                # Selectbox Phương Thức (Nhớ giá trị cũ)
                 try:
                     idx = st.session_state.methods.index(st.session_state.last_method)
                 except: idx = 0
@@ -333,16 +330,12 @@ def main_app():
             with st.container():
                 st.subheader("📊 Phân Tích")
                 if not df.empty:
-                    # Tab Nguồn Tiền Theo Phương Án 1 (Tách dòng tiền vào/ra)
                     tab_chi, tab_thu, tab_nguon = st.tabs(["📉 Chi Tiêu", "📈 Thu Nhập", "💳 Nguồn Tiền"])
                     
-                    # Hàm vẽ biểu đồ đồng bộ màu sắc
                     def draw_chart(sub_df, group_col, color_scheme):
                         if not sub_df.empty:
                             chart_data = sub_df.groupby(group_col)['so_tien'].sum().reset_index()
-                            
                             unique_cats = chart_data[group_col].unique()
-                            # Color matching
                             color_map = {cat: COLOR_PALETTE[i % len(COLOR_PALETTE)] for i, cat in enumerate(unique_cats)}
                             
                             base = alt.Chart(chart_data).encode(theta=alt.Theta("so_tien", stack=True))
@@ -366,7 +359,6 @@ def main_app():
                     with tab_chi: draw_chart(df[df['loai']=='Chi'], 'phan_loai', 'turbo')
                     with tab_thu: draw_chart(df[df['loai']=='Thu'], 'phan_loai', 'greens')
                     
-                    # TAB NGUỒN TIỀN (Phương án 1 - Tách biệt)
                     with tab_nguon:
                         col_in, col_out = st.columns(2)
                         with col_in:
@@ -380,7 +372,6 @@ def main_app():
 
         st.divider()
         
-        # --- SMART HISTORY (EXPANDER) ---
         with st.expander("📅 Lịch sử & Chỉnh sửa (Click để xem)", expanded=False):
             if not df.empty:
                 c_d, c_v = st.columns([1,2])
@@ -467,6 +458,7 @@ def main_app():
         st.divider()
         if st.button("🔒 ĐĂNG XUẤT KHỎI THIẾT BỊ", type="primary", use_container_width=True):
             st.session_state.logged_in = False
+            st.session_state.pin_buffer = "" # Fix lỗi auto login
             st.rerun()
 
 login_system()
