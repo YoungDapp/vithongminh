@@ -18,7 +18,7 @@ except Exception as e:
     st.error("❌ Thiếu cấu hình Supabase!")
     st.stop()
 
-# --- 2. CSS CAO CẤP (GIỮ NGUYÊN GIAO DIỆN ĐẸP) ---
+# --- 2. CSS CAO CẤP ---
 def load_css():
     st.markdown("""
     <style>
@@ -41,25 +41,22 @@ def load_css():
             color: #fff;
         }
 
-        /* --- CUSTOM METRIC CARDS --- */
+        /* Metric Cards */
         .metric-card {
             background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px);
             border-radius: 16px; padding: 15px;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: transform 0.2s;
-            margin-bottom: 10px;
+            transition: transform 0.2s; margin-bottom: 10px;
         }
         .metric-card:hover { transform: translateY(-3px); }
-        
         .card-income { border-bottom: 3px solid #00f2c3; box-shadow: 0 5px 20px -10px rgba(0, 242, 195, 0.2); }
         .card-expense { border-bottom: 3px solid #ff4b4b; box-shadow: 0 5px 20px -10px rgba(255, 75, 75, 0.2); }
         .card-balance { border-bottom: 3px solid #7000ff; box-shadow: 0 5px 20px -10px rgba(112, 0, 255, 0.2); }
-
+        
         .metric-label { font-size: 0.85rem; color: #ccc; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
         .metric-value { font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
         .metric-delta { font-size: 0.8rem; font-weight: 500; padding: 2px 8px; border-radius: 8px; display: inline-block; }
         
-        /* Text Colors */
         .text-green { color: #00f2c3 !important; text-shadow: 0 0 15px rgba(0, 242, 195, 0.3); }
         .text-red { color: #ff4b4b !important; text-shadow: 0 0 15px rgba(255, 75, 75, 0.3); }
         .text-purple { color: #a742ff !important; text-shadow: 0 0 15px rgba(167, 66, 255, 0.3); }
@@ -76,38 +73,32 @@ def load_css():
             background: rgba(0, 242, 195, 0.1); box-shadow: 0 0 15px rgba(0, 242, 195, 0.3);
         }
         div.stButton > button:active { background: #00f2c3; color: #000; }
-        
-        /* Logout Button */
         div.stButton > button.logout-btn { border-color: #ff4b4b !important; color: #ff4b4b !important; }
 
-        /* Inputs & Editor */
+        /* Inputs */
         .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div, [data-testid="stDataEditor"] {
             background-color: rgba(0, 0, 0, 0.3) !important; color: #fff !important;
             border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 8px !important;
         }
         
         /* Tabs */
-        .stTabs [data-baseweb="tab-list"] { 
-            gap: 8px; background: rgba(255,255,255,0.05); padding: 6px; border-radius: 30px; justify-content: center; 
-        }
+        .stTabs [data-baseweb="tab-list"] { gap: 8px; background: rgba(255,255,255,0.05); padding: 6px; border-radius: 30px; justify-content: center; }
         .stTabs [data-baseweb="tab"] { border-radius: 20px; border: none; color: #aaa; }
         .stTabs [aria-selected="true"] { 
             background: linear-gradient(90deg, #00f2c3, #0098f0); color: #fff !important; font-weight: bold;
             box-shadow: 0 4px 10px rgba(0, 242, 195, 0.3);
         }
         
-        /* Login Box Simple */
-        .login-box { max-width: 400px; margin: 0 auto; padding: 40px 20px; text-align: center; }
+        /* Login Dots */
+        .pin-area { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
+        .dot { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #555; transition: 0.2s; }
+        .dot.active { background: #00f2c3; border-color: #00f2c3; box-shadow: 0 0 10px #00f2c3; }
     </style>
     """, unsafe_allow_html=True)
 load_css()
 
-# --- 3. DATABASE & LOGIC ---
-COLOR_PALETTE = [
-    "#00f2c3", "#ff4b4b", "#f7b731", "#a55eea", "#4b7bec", 
-    "#fa8231", "#2bcbba", "#eb3b5a", "#3867d6", "#8854d0",
-    "#20bf6b", "#0fb9b1", "#45aaf2", "#fd9644", "#fc5c65"
-]
+# --- 3. DATABASE ---
+COLOR_PALETTE = ["#00f2c3", "#ff4b4b", "#f7b731", "#a55eea", "#4b7bec", "#fa8231", "#2bcbba", "#eb3b5a", "#3867d6", "#8854d0"]
 
 # @st.cache_data(ttl=30)
 def load_data():
@@ -123,13 +114,10 @@ def load_data():
         
         c = supabase.table('categories').select("*").execute()
         cats = [x['ten_danh_muc'] for x in c.data] if c.data else ["Ăn uống", "Khác"]
-
         m = supabase.table('payment_methods').select("*").execute()
         methods = [x['ten_phuong_thuc'] for x in m.data] if m.data else ["Ví tiền mặt", "Tài khoản ngân hàng", "Thẻ"]
-
         return df, cats, methods
-    except Exception as e:
-        return pd.DataFrame(), [], []
+    except Exception as e: return pd.DataFrame(), [], []
 
 def add_trans(row): supabase.table('transactions').insert(row).execute()
 def update_trans(tid, row): supabase.table('transactions').update(row).eq('id', tid).execute()
@@ -138,16 +126,6 @@ def add_cat(n): supabase.table('categories').insert({"ten_danh_muc": n}).execute
 def del_cat(n): supabase.table('categories').delete().eq('ten_danh_muc', n).execute()
 def add_method(n): supabase.table('payment_methods').insert({"ten_phuong_thuc": n}).execute()
 def del_method(n): supabase.table('payment_methods').delete().eq('ten_phuong_thuc', n).execute()
-
-# DB PIN Functions
-def get_pin_from_db():
-    try:
-        r = supabase.table('app_config').select("value").eq("key", "user_pin").execute()
-        return r.data[0]['value'] if r.data else None
-    except: return None
-
-def set_pin_db(v):
-    supabase.table('app_config').upsert({"key": "user_pin", "value": v}).execute()
 
 def calculate_kpis(df):
     if df.empty: return 0, 0, 0, 0, 0
@@ -167,50 +145,34 @@ def calculate_kpis(df):
     pct_exp = ((exp - last_exp)/last_exp)*100 if last_exp > 0 else (100 if exp > 0 else 0)
     return inc, exp, bal, pct_inc, pct_exp
 
-# --- 4. HỆ THỐNG ĐĂNG NHẬP (AUTO CHECK ON ENTER) ---
+# --- 4. ĐĂNG NHẬP ---
 def login_system():
     if "logged_in" not in st.session_state: st.session_state.logged_in = False
     if st.session_state.logged_in: return True
 
-    stored = get_pin_from_db()
-
-    st.markdown("<div class='login-box'>", unsafe_allow_html=True)
-    st.markdown("<h1>🔒 SmartWallet Pro</h1>", unsafe_allow_html=True)
+    def get_pin():
+        try: return supabase.table('app_config').select("value").eq("key", "user_pin").execute().data[0]['value']
+        except: return None
+    def set_pin(v): supabase.table('app_config').upsert({"key": "user_pin", "value": v}).execute()
+    
+    stored = get_pin()
+    st.markdown("<div class='login-box'><h1 style='text-align: center;'>🔒 SmartWallet Pro</h1>", unsafe_allow_html=True)
     
     if stored is None:
         st.info("🆕 Tạo PIN mới (4 số)")
         def setup_cb():
-            new_p = st.session_state.new_pin_val
-            if len(new_p)==4 and new_p.isdigit():
-                set_pin_db(new_p)
-                st.success("Đã tạo PIN!")
-                time.sleep(1)
-                st.session_state.logged_in = True
-                # st.rerun() handled by state change
-            elif len(new_p) > 0: 
-                st.error("PIN phải là 4 chữ số")
-        
-        st.text_input("Nhập PIN mới", type="password", max_chars=4, key="new_pin_val", on_change=setup_cb)
+            if len(st.session_state.new_p)==4 and st.session_state.new_p.isdigit():
+                set_pin(st.session_state.new_p); st.session_state.logged_in = True
+            else: st.error("PIN phải là 4 số")
+        st.text_input("Nhập PIN mới", type="password", max_chars=4, key="new_p", on_change=setup_cb)
     else:
-        # Callback kiểm tra PIN ngay khi Enter
         def check_login():
-            input_p = st.session_state.login_pin_val
-            if len(input_p) == 4:
-                if input_p == stored:
-                    st.session_state.logged_in = True
-                else:
-                    st.toast("❌ Sai mã PIN", icon="⚠️")
-            elif len(input_p) > 0:
-                st.toast("⚠️ Vui lòng nhập đủ 4 số", icon="ℹ️")
-
-        st.text_input("Nhập mã PIN (Ấn Enter)", type="password", max_chars=4, key="login_pin_val", on_change=check_login)
+            if st.session_state.log_p == stored: st.session_state.logged_in = True
+            else: st.toast("❌ Sai mã PIN", icon="⚠️")
+        st.text_input("Nhập mã PIN (Enter)", type="password", max_chars=4, key="log_p", on_change=check_login)
     
     st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Kiểm tra lại lần nữa để rerun nếu vừa đăng nhập thành công
-    if st.session_state.logged_in:
-        st.rerun()
-        
+    if st.session_state.logged_in: st.rerun()
     st.stop()
 
 # --- 5. APP CHÍNH ---
@@ -219,63 +181,59 @@ def main_app():
     st.session_state.categories = cats
     st.session_state.methods = methods
     
-    # Init Keys
-    if 'w_opt' not in st.session_state: st.session_state.w_opt = "➕ Mới..."
-    if 'w_desc' not in st.session_state: st.session_state.w_desc = ""
-    if 'w_amt' not in st.session_state: st.session_state.w_amt = 0
-    if 'w_note' not in st.session_state: st.session_state.w_note = ""
-    if 'w_debt' not in st.session_state: st.session_state.w_debt = False
-    if 'last_method' not in st.session_state:
-        st.session_state.last_method = methods[0] if methods else "Ví tiền mặt"
+    # Init keys cho từng tab (Thu/Chi)
+    for p in ['chi', 'thu']:
+        if f'w_opt_{p}' not in st.session_state: st.session_state[f'w_opt_{p}'] = "➕ Mới..."
+        if f'w_desc_{p}' not in st.session_state: st.session_state[f'w_desc_{p}'] = ""
+        if f'w_amt_{p}' not in st.session_state: st.session_state[f'w_amt_{p}'] = 0
+        if f'w_note_{p}' not in st.session_state: st.session_state[f'w_note_{p}'] = ""
+        if f'w_debt_{p}' not in st.session_state: st.session_state[f'w_debt_{p}'] = False
+        
+    if 'last_method' not in st.session_state: st.session_state.last_method = methods[0] if methods else "Ví tiền mặt"
 
-    def save_callback():
-        opt = st.session_state.get("w_opt", "")
-        desc = st.session_state.get("w_desc", "")
-        amt = st.session_state.get("w_amt", 0)
+    def save_transaction(suffix, type_str):
+        # Lấy dữ liệu theo suffix (chi hoặc thu)
+        opt = st.session_state.get(f"w_opt_{suffix}", "")
+        desc = st.session_state.get(f"w_desc_{suffix}", "")
+        amt = st.session_state.get(f"w_amt_{suffix}", 0)
+        cat = st.session_state.get(f"w_cat_{suffix}", "Khác")
+        method = st.session_state.get(f"w_method_{suffix}", "Ví tiền mặt")
+        debt = st.session_state.get(f"w_debt_{suffix}", False)
+        date_val = st.session_state.get(f"w_date_{suffix}", None)
+        note = st.session_state.get(f"w_note_{suffix}", "")
+        
         final = desc if opt == "➕ Mới..." else opt
         
-        w_type = st.session_state.get("w_type", "Chi")
-        w_cat = st.session_state.get("w_cat", "Khác")
-        w_method = st.session_state.get("w_method", "Ví tiền mặt")
-        w_debt = st.session_state.get("w_debt", False)
-        w_date = st.session_state.get("w_date", None)
-        w_note = st.session_state.get("w_note", "")
-
         if amt > 0 and final:
             row = {
                 "ngay": str(datetime.datetime.now()), "muc": final, "so_tien": amt,
-                "loai": "Thu" if "Thu" in w_type else "Chi",
-                "phan_loai": w_cat,
-                "phuong_thuc": w_method,
-                "han_tra": str(w_date) if w_debt else None,
-                "trang_thai": "Đang nợ" if w_debt else "Đã xong",
-                "ghi_chu": w_note
+                "loai": type_str, "phan_loai": cat, "phuong_thuc": method,
+                "han_tra": str(date_val) if debt else None,
+                "trang_thai": "Đang nợ" if debt else "Đã xong", "ghi_chu": note
             }
             add_trans(row)
-            st.session_state.last_method = w_method
-            st.toast("Đã lưu!", icon="✨")
+            st.session_state.last_method = method
+            st.toast(f"Đã lưu khoản {type_str}!", icon="✨")
             
-            # Reset Form
-            st.session_state.w_amt = 0
-            if "w_desc" in st.session_state: st.session_state.w_desc = ""
-            if "w_note" in st.session_state: st.session_state.w_note = ""
-            if "w_debt" in st.session_state: st.session_state.w_debt = False
-            st.session_state.w_opt = "➕ Mới..."
-        else: st.toast("Thiếu thông tin!", icon="⚠️")
+            # Reset form của tab đó
+            st.session_state[f'w_amt_{suffix}'] = 0
+            st.session_state[f'w_desc_{suffix}'] = ""
+            st.session_state[f'w_note_{suffix}'] = ""
+            st.session_state[f'w_debt_{suffix}'] = False
+            st.session_state[f'w_opt_{suffix}'] = "➕ Mới..."
+        else:
+            st.toast("Thiếu thông tin!", icon="⚠️")
 
     with st.sidebar:
         st.title("⚡ Menu")
-        if st.button("🔄 Tải lại"): st.cache_data.clear(); st.rerun()
+        if st.button("🔄 Reload"): st.cache_data.clear(); st.rerun()
 
     tab1, tab2, tab3 = st.tabs(["📊 TỔNG QUAN", "⏳ SỔ NỢ", "⚙️ CÀI ĐẶT"])
 
     with tab1:
-        # KPI Cards
         inc, exp, bal, pi, pe = calculate_kpis(df)
-        ci = "text-green" if pi>=0 else "text-red"
-        icon_i = "↗" if pi>=0 else "↘"
-        ce = "text-red" if pe>=0 else "text-green"
-        icon_e = "↗" if pe>=0 else "↘"
+        ci, icon_i = ("text-green", "↗") if pi>=0 else ("text-red", "↘")
+        ce, icon_e = ("text-red", "↗") if pe>=0 else ("text-green", "↘")
         
         c1, c2, c3 = st.columns(3)
         with c1: st.markdown(f'<div class="metric-card card-income"><div class="metric-label">Thu Nhập</div><div class="metric-value text-green">{inc:,.0f}</div><div class="metric-delta bg-green-soft">{icon_i} {abs(pi):.1f}%</div></div>', unsafe_allow_html=True)
@@ -283,31 +241,59 @@ def main_app():
         with c3: st.markdown(f'<div class="metric-card card-balance"><div class="metric-label">Số Dư</div><div class="metric-value text-purple">{bal:,.0f}</div><div class="metric-delta" style="color:#aaa">Cashflow</div></div>', unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # --- NHẬP & CHART ---
         c_left, c_right = st.columns([1, 1.6], gap="large")
         with c_left:
             with st.container():
-                st.subheader("📝 Nhập Mới")
-                hist = df['muc'].unique().tolist() if not df.empty else []
-                if hist: hist.reverse()
-                st.selectbox("Nội dung", ["➕ Mới..."] + hist, key="w_opt")
-                if st.session_state.w_opt == "➕ Mới...": st.text_input("Tên mục:", key="w_desc")
+                st.subheader("📝 Nhập Giao Dịch")
                 
-                st.number_input("Số tiền:", step=50000, format="%d", key="w_amt")
-                if st.session_state.w_amt > 0: st.caption(f"👉 {st.session_state.w_amt:,.0f} VNĐ")
+                # TÁCH TAB NHẬP LIỆU
+                tab_input_chi, tab_input_thu = st.tabs(["🔴 Chi Tiêu", "🟢 Thu Nhập"])
                 
-                c1, c2 = st.columns(2)
-                with c1: st.radio("Loại:", ["Chi tiền", "Thu tiền"], key="w_type")
-                with c2: st.selectbox("Nhóm:", st.session_state.categories, key="w_cat")
-                
-                try: idx = st.session_state.methods.index(st.session_state.last_method)
-                except: idx = 0
-                st.selectbox("Phương thức:", st.session_state.methods, index=idx, key="w_method")
+                # --- FORM CHI TIÊU ---
+                with tab_input_chi:
+                    hist_chi = df[df['loai']=='Chi']['muc'].unique().tolist() if not df.empty else []
+                    if hist_chi: hist_chi.reverse()
+                    
+                    st.selectbox("Nội dung chi", ["➕ Mới..."] + hist_chi, key="w_opt_chi")
+                    if st.session_state.w_opt_chi == "➕ Mới...": st.text_input("Tên mục:", key="w_desc_chi")
+                    
+                    st.number_input("Số tiền chi:", step=50000, format="%d", key="w_amt_chi")
+                    if st.session_state.w_amt_chi > 0: st.caption(f"👉 {st.session_state.w_amt_chi:,.0f} VNĐ")
+                    
+                    cc1, cc2 = st.columns(2)
+                    with cc1: st.selectbox("Nhóm:", st.session_state.categories, key="w_cat_chi")
+                    with cc2: 
+                        try: idx = st.session_state.methods.index(st.session_state.last_method)
+                        except: idx = 0
+                        st.selectbox("Ví/Thẻ:", st.session_state.methods, index=idx, key="w_method_chi")
+                    
+                    st.checkbox("Ghi nợ (Chưa trả)?", key="w_debt_chi")
+                    if st.session_state.w_debt_chi: st.date_input("Hạn trả:", key="w_date_chi")
+                    st.text_input("Ghi chú:", key="w_note_chi")
+                    st.button("LƯU KHOẢN CHI 💸", type="primary", on_click=save_transaction, args=("chi", "Chi"), use_container_width=True)
 
-                st.checkbox("Vay/Nợ?", key="w_debt")
-                if st.session_state.w_debt: st.date_input("Hạn:", key="w_date")
-                st.text_input("Ghi chú:", key="w_note")
-                st.button("LƯU NGAY ✨", type="primary", on_click=save_callback, use_container_width=True)
+                # --- FORM THU NHẬP ---
+                with tab_input_thu:
+                    hist_thu = df[df['loai']=='Thu']['muc'].unique().tolist() if not df.empty else []
+                    if hist_thu: hist_thu.reverse()
+                    
+                    st.selectbox("Nguồn thu", ["➕ Mới..."] + hist_thu, key="w_opt_thu")
+                    if st.session_state.w_opt_thu == "➕ Mới...": st.text_input("Tên nguồn:", key="w_desc_thu")
+                    
+                    st.number_input("Số tiền thu:", step=50000, format="%d", key="w_amt_thu")
+                    if st.session_state.w_amt_thu > 0: st.caption(f"👉 {st.session_state.w_amt_thu:,.0f} VNĐ")
+                    
+                    ct1, ct2 = st.columns(2)
+                    with ct1: st.selectbox("Nhóm:", st.session_state.categories, key="w_cat_thu")
+                    with ct2: 
+                        try: idx = st.session_state.methods.index(st.session_state.last_method)
+                        except: idx = 0
+                        st.selectbox("Về Ví/Thẻ:", st.session_state.methods, index=idx, key="w_method_thu")
+                    
+                    st.checkbox("Đi vay (Phải trả)?", key="w_debt_thu")
+                    if st.session_state.w_debt_thu: st.date_input("Hạn trả:", key="w_date_thu")
+                    st.text_input("Ghi chú:", key="w_note_thu")
+                    st.button("LƯU KHOẢN THU 💰", type="primary", on_click=save_transaction, args=("thu", "Thu"), use_container_width=True)
 
         with c_right:
             with st.container():
@@ -420,29 +406,22 @@ def main_app():
             if st.button("Xóa PT"): del_method(dm); st.rerun()
         
         st.divider()
-        
-        # --- ĐỔI MÃ PIN ---
         st.subheader("🔐 Đổi Mã PIN")
         cp1, cp2 = st.columns(2)
         with cp1: old_p = st.text_input("PIN cũ:", type="password")
         with cp2: new_p = st.text_input("PIN mới (4 số):", type="password", max_chars=4)
-        
         if st.button("Cập nhật PIN", type="primary"):
-            real_pin = get_pin_from_db()
+            real_pin = supabase.table('app_config').select("value").eq("key", "user_pin").execute().data[0]['value']
             if old_p == real_pin:
                 if len(new_p)==4 and new_p.isdigit():
-                    set_pin_db(new_p)
-                    st.success("Đổi PIN thành công! Vui lòng đăng nhập lại.")
-                    time.sleep(1)
-                    st.session_state.logged_in = False
-                    st.rerun()
-                else: st.warning("PIN mới phải là 4 chữ số")
+                    supabase.table('app_config').upsert({"key": "user_pin", "value": new_p}).execute()
+                    st.success("Đổi PIN thành công!"); time.sleep(1); st.session_state.logged_in = False; st.rerun()
+                else: st.warning("PIN phải là 4 số")
             else: st.error("PIN cũ không đúng")
 
         st.divider()
-        if st.button("🔒 ĐĂNG XUẤT KHỎI THIẾT BỊ", type="primary", use_container_width=True):
-            st.session_state.logged_in = False
-            st.rerun()
+        if st.button("🔒 ĐĂNG XUẤT", type="primary", use_container_width=True):
+            st.session_state.logged_in = False; st.rerun()
 
 login_system()
 main_app()
