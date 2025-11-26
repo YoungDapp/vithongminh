@@ -18,7 +18,7 @@ except Exception as e:
     st.error("❌ Thiếu cấu hình Supabase!")
     st.stop()
 
-# --- 2. CSS CAO CẤP (V13/V19 NEON PRO - ĐÃ KHÔI PHỤC) ---
+# --- 2. CSS CAO CẤP ---
 def load_css():
     st.markdown("""
     <style>
@@ -41,7 +41,7 @@ def load_css():
             color: #fff;
         }
 
-        /* --- CUSTOM METRIC CARDS (KHÔI PHỤC HIỆU ỨNG NEON) --- */
+        /* --- CUSTOM METRIC CARDS --- */
         .metric-card {
             background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px);
             border-radius: 16px; padding: 15px;
@@ -157,7 +157,7 @@ def calculate_kpis(df):
     pct_exp = ((exp - last_exp)/last_exp)*100 if last_exp > 0 else (100 if exp > 0 else 0)
     return inc, exp, bal, pct_inc, pct_exp
 
-# --- 4. HỆ THỐNG ĐĂNG NHẬP (FORM MẶC ĐỊNH - KHÔNG KEYPAD) ---
+# --- 4. HỆ THỐNG ĐĂNG NHẬP (AUTO CHECK) ---
 def login_system():
     if "logged_in" not in st.session_state: st.session_state.logged_in = False
     if st.session_state.logged_in: return True
@@ -171,27 +171,39 @@ def login_system():
     
     stored = get_pin()
 
-    # Giao diện Login Đơn giản
     st.markdown("<div class='login-box'>", unsafe_allow_html=True)
     st.markdown("<h1>🔒 SmartWallet</h1>", unsafe_allow_html=True)
     
     if stored is None:
         st.info("🆕 Tạo PIN mới (4 số)")
-        pin1 = st.text_input("Nhập PIN mới", type="password", key="p1")
-        if st.button("LƯU PIN", type="primary", use_container_width=True):
-            if len(pin1)==4 and pin1.isdigit():
-                set_pin(pin1)
-                st.success("Đã tạo PIN!"); time.sleep(1); st.session_state.logged_in = True; st.rerun()
+        def setup_cb():
+            new_p = st.session_state.new_pin
+            if len(new_p)==4 and new_p.isdigit():
+                set_pin(new_p)
+                st.success("Đã tạo PIN!")
+                time.sleep(1)
+                st.session_state.logged_in = True
             else: st.error("PIN phải là 4 chữ số")
+        
+        st.text_input("Nhập PIN mới", type="password", max_chars=4, key="new_pin", on_change=setup_cb)
     else:
-        pin_input = st.text_input("Nhập mã PIN", type="password", key="p_in")
-        if st.button("ĐĂNG NHẬP 🚀", type="primary", use_container_width=True):
-            if pin_input == stored:
-                st.session_state.logged_in = True; st.rerun()
-            else:
-                st.error("Sai mã PIN")
+        def login_cb():
+            input_p = st.session_state.login_pin
+            if len(input_p) == 4:
+                if input_p == stored:
+                    st.session_state.logged_in = True
+                else:
+                    st.error("Sai mã PIN")
+            elif len(input_p) > 0:
+                st.warning("Vui lòng nhập đủ 4 số")
+
+        st.text_input("Nhập mã PIN (Ấn Enter)", type="password", max_chars=4, key="login_pin", on_change=login_cb)
     
     st.markdown("</div>", unsafe_allow_html=True)
+    
+    if st.session_state.logged_in:
+        st.rerun()
+        
     st.stop()
 
 # --- 5. APP CHÍNH ---
