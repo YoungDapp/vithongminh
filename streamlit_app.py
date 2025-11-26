@@ -227,69 +227,75 @@ def delete_category_db(cat_name):
     except:
         return False
 
-# --- 5. HỆ THỐNG BẢO MẬT (V5 - FIXED MOBILE LAYOUT) ---
+# --- 5. HỆ THỐNG BẢO MẬT (V6 - FIX CỨNG CHO MOBILE) ---
 def login_system():
-    # CSS: Ép buộc giao diện Mobile hiển thị đúng ý
+    # CSS HẠT NHÂN: ÉP BUỘC 3 CỘT TRÊN MOBILE
     st.markdown("""
     <style>
-        /* 1. Ép các cột (st.columns) KHÔNG được xuống dòng trên mobile */
-        div[data-testid="column"] {
+        /* 1. QUAN TRỌNG NHẤT: Ép các cột không được xuống dòng */
+        [data-testid="column"] {
             width: 33.33% !important;
             flex: 1 1 33.33% !important;
-            min-width: 50px !important;
+            min-width: 0px !important; /* Đây là chìa khóa: Cho phép cột co nhỏ tối đa */
+        }
+        
+        /* 2. Container căn giữa bàn phím */
+        .keypad-wrapper {
+            max-width: 350px;
+            margin: 0 auto;
+            padding: 10px;
         }
 
-        /* 2. Style cho nút bấm: Tròn, Viền Neon, Bỏ màu đỏ mặc định */
+        /* 3. Style nút bấm: Xử lý triệt để viền đỏ và méo hình */
         div.stButton > button {
             width: 100% !important;
-            aspect-ratio: 1 / 1 !important; /* Ép luôn là hình vuông/tròn */
+            aspect-ratio: 1 / 1 !important; /* Luôn vuông/tròn */
             border-radius: 50% !important;
-            
-            font-size: 28px !important;
-            font-weight: 600 !important;
-            
-            /* Màu sắc Neon Teal */
-            background: rgba(255, 255, 255, 0.05) !important;
-            border: 2px solid #00f2c3 !important; /* Viền xanh ngọc */
-            color: #00f2c3 !important;
-            
-            box-shadow: 0 0 10px rgba(0, 242, 195, 0.1) !important;
-            transition: all 0.2s !important;
             margin: 0 !important;
+            
+            /* Font và Màu */
+            font-size: 24px !important;
+            font-weight: 700 !important;
+            color: #00f2c3 !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+            
+            /* Viền Neon (Ghi đè viền đỏ mặc định) */
+            border: 2px solid #00f2c3 !important;
+            box-shadow: 0 0 10px rgba(0, 242, 195, 0.1) !important;
         }
 
-        /* Hiệu ứng khi bấm */
+        /* Hiệu ứng bấm */
         div.stButton > button:active {
-            background: rgba(0, 242, 195, 0.3) !important;
-            transform: scale(0.9);
+            background-color: #00f2c3 !important;
+            color: #000 !important;
+            transform: scale(0.95);
         }
 
-        /* 3. Căn giữa tiêu đề và chấm tròn */
-        .login-header {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 20px;
+        /* Ẩn các khoảng trắng thừa thãi của Streamlit */
+        .block-container {
+            padding-top: 2rem !important;
+            padding-bottom: 0rem !important;
         }
         
         /* Chấm tròn PIN */
-        .pin-dots {
+        .pin-display-area {
             display: flex;
+            justify-content: center;
             gap: 15px;
-            margin-top: 20px;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
+            margin-top: 10px;
         }
-        .dot {
-            width: 18px;
-            height: 18px;
+        .pin-dot {
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
             border: 2px solid #555;
             transition: 0.2s;
         }
-        .dot.active {
+        .pin-dot.active {
             background-color: #00f2c3;
             border-color: #00f2c3;
-            box-shadow: 0 0 15px #00f2c3;
+            box-shadow: 0 0 10px #00f2c3;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -299,92 +305,90 @@ def login_system():
 
     if "pin_buffer" not in st.session_state: st.session_state.pin_buffer = ""
 
-    # Container chính (Giới hạn chiều rộng để đẹp trên PC)
-    _, main_col, _ = st.columns([1, 4, 1])
+    # BẮT ĐẦU GIAO DIỆN
+    # Không dùng st.columns bọc ngoài nữa, dùng div wrapper để căn giữa
+    st.markdown('<div class="keypad-wrapper">', unsafe_allow_html=True)
     
-    with main_col:
-        # Header (Tiêu đề + Chấm tròn)
-        st.markdown('<div class="login-header">', unsafe_allow_html=True)
-        st.markdown("<h1>🔒 SmartWallet</h1>", unsafe_allow_html=True)
-        
-        # Vẽ chấm tròn
-        dots_html = '<div class="pin-dots">'
-        for i in range(4):
-            active_class = "active" if i < len(st.session_state.pin_buffer) else ""
-            dots_html += f'<div class="dot {active_class}"></div>'
-        dots_html += '</div>'
-        st.markdown(dots_html, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Header
+    st.markdown("<h1 style='text-align: center; color: #fff; margin-bottom: 0;'>🔒 SmartWallet</h1>", unsafe_allow_html=True)
+    
+    # Hiển thị chấm tròn
+    dots_html = '<div class="pin-display-area">'
+    for i in range(4):
+        state = "active" if i < len(st.session_state.pin_buffer) else ""
+        dots_html += f'<div class="pin-dot {state}"></div>'
+    dots_html += '</div>'
+    st.markdown(dots_html, unsafe_allow_html=True)
 
-        # --- LOGIC SUPABASE ---
-        def get_pin_db():
-            try:
-                res = supabase.table('app_config').select("value").eq("key", "user_pin").execute()
-                return res.data[0]['value'] if res.data else None
-            except: return None
+    # Logic Database
+    def get_pin_db():
+        try:
+            res = supabase.table('app_config').select("value").eq("key", "user_pin").execute()
+            return res.data[0]['value'] if res.data else None
+        except: return None
 
-        def set_pin_db(val):
-            supabase.table('app_config').upsert({"key": "user_pin", "value": val}).execute()
+    def set_pin_db(val):
+        supabase.table('app_config').upsert({"key": "user_pin", "value": val}).execute()
 
-        stored_pin = get_pin_db()
+    stored_pin = get_pin_db()
 
+    if stored_pin is None:
+        st.info("🆕 Tạo PIN mới")
+
+    # --- BÀN PHÍM SỐ ---
+    def press(val):
+        if len(st.session_state.pin_buffer) < 4:
+            st.session_state.pin_buffer += val
+    def clear(): st.session_state.pin_buffer = ""
+    def back(): st.session_state.pin_buffer = st.session_state.pin_buffer[:-1]
+
+    # GRID 3 CỘT (Đã bị ép bởi CSS ở trên)
+    # Hàng 1
+    c1, c2, c3 = st.columns(3)
+    with c1: st.button("1", on_click=press, args=("1",), key="k1", use_container_width=True)
+    with c2: st.button("2", on_click=press, args=("2",), key="k2", use_container_width=True)
+    with c3: st.button("3", on_click=press, args=("3",), key="k3", use_container_width=True)
+
+    # Hàng 2
+    c1, c2, c3 = st.columns(3)
+    with c1: st.button("4", on_click=press, args=("4",), key="k4", use_container_width=True)
+    with c2: st.button("5", on_click=press, args=("5",), key="k5", use_container_width=True)
+    with c3: st.button("6", on_click=press, args=("6",), key="k6", use_container_width=True)
+
+    # Hàng 3
+    c1, c2, c3 = st.columns(3)
+    with c1: st.button("7", on_click=press, args=("7",), key="k7", use_container_width=True)
+    with c2: st.button("8", on_click=press, args=("8",), key="k8", use_container_width=True)
+    with c3: st.button("9", on_click=press, args=("9",), key="k9", use_container_width=True)
+
+    # Hàng 4
+    c1, c2, c3 = st.columns(3)
+    with c1: st.button("C", on_click=clear, key="k_clr", use_container_width=True)
+    with c2: st.button("0", on_click=press, args=("0",), key="k0", use_container_width=True)
+    with c3: st.button("⌫", on_click=back, key="k_del", use_container_width=True)
+
+    st.markdown('</div>', unsafe_allow_html=True) # Đóng wrapper
+
+    # --- KIỂM TRA PIN ---
+    curr = st.session_state.pin_buffer
+    if len(curr) == 4:
         if stored_pin is None:
-            st.info("🆕 Tạo PIN mới")
-
-        # --- BÀN PHÍM SỐ (DÙNG ST.COLUMNS) ---
-        # Logic bấm nút
-        def press(val):
-            if len(st.session_state.pin_buffer) < 4:
-                st.session_state.pin_buffer += val
-        def clear(): st.session_state.pin_buffer = ""
-        def back(): st.session_state.pin_buffer = st.session_state.pin_buffer[:-1]
-
-        # Hàng 1
-        c1, c2, c3 = st.columns(3)
-        with c1: st.button("1", on_click=press, args=("1",), key="k1")
-        with c2: st.button("2", on_click=press, args=("2",), key="k2")
-        with c3: st.button("3", on_click=press, args=("3",), key="k3")
-
-        # Hàng 2
-        c1, c2, c3 = st.columns(3)
-        with c1: st.button("4", on_click=press, args=("4",), key="k4")
-        with c2: st.button("5", on_click=press, args=("5",), key="k5")
-        with c3: st.button("6", on_click=press, args=("6",), key="k6")
-
-        # Hàng 3
-        c1, c2, c3 = st.columns(3)
-        with c1: st.button("7", on_click=press, args=("7",), key="k7")
-        with c2: st.button("8", on_click=press, args=("8",), key="k8")
-        with c3: st.button("9", on_click=press, args=("9",), key="k9")
-
-        # Hàng 4
-        c1, c2, c3 = st.columns(3)
-        with c1: st.button("C", on_click=clear, key="k_clr")
-        with c2: st.button("0", on_click=press, args=("0",), key="k0")
-        with c3: st.button("⌫", on_click=back, key="k_del")
-
-        # --- CHECK PIN ---
-        curr = st.session_state.pin_buffer
-        if len(curr) == 4:
-            if stored_pin is None:
-                # Nút lưu PIN mới (Nằm ngoài columns để full width)
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("💾 LƯU PIN", type="primary", use_container_width=True):
-                    set_pin_db(curr)
-                    st.success("Đã tạo PIN!")
-                    time.sleep(1)
-                    st.session_state.logged_in = True
-                    st.rerun()
+            if st.button("💾 LƯU PIN", type="primary", use_container_width=True):
+                set_pin_db(curr)
+                st.success("OK!")
+                time.sleep(1)
+                st.session_state.logged_in = True
+                st.rerun()
+        else:
+            if curr == stored_pin:
+                st.session_state.logged_in = True
+                st.rerun()
             else:
-                if curr == stored_pin:
-                    st.session_state.logged_in = True
-                    st.rerun()
-                else:
-                    st.toast("❌ Sai PIN", icon="⚠️")
-                    time.sleep(0.3)
-                    st.session_state.pin_buffer = ""
-                    st.rerun()
-
+                st.toast("Sai PIN!", icon="⚠️")
+                time.sleep(0.3)
+                st.session_state.pin_buffer = ""
+                st.rerun()
+    
     st.stop()
 
 # --- 6. APP CHÍNH (GIAO DIỆN MỚI) ---
