@@ -22,13 +22,11 @@ except Exception as e:
 def load_css():
     st.markdown("""
     <style>
-        /* Nền Deep Purple Gradient */
         .stApp {
             background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
             color: #e0e0ff;
             font-family: 'Inter', sans-serif;
         }
-        
         header {visibility: hidden;}
         .block-container { padding-top: 1rem !important; padding-bottom: 5rem !important; }
 
@@ -72,11 +70,11 @@ def load_css():
             background: #00f2c3; color: #000;
         }
 
-        /* Inputs */
-        .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div {
+        /* Inputs & Data Editor */
+        .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div,
+        [data-testid="stDataEditor"] {
             background-color: rgba(0, 0, 0, 0.3) !important;
             color: #fff !important;
-            border: 1px solid rgba(255, 255, 255, 0.2) !important;
             border-radius: 8px !important;
         }
         
@@ -110,7 +108,12 @@ def load_data():
     except: return pd.DataFrame(), []
 
 def add_trans(row): supabase.table('transactions').insert(row).execute()
-def del_trans(tid): supabase.table('transactions').delete().eq('id', tid).execute()
+# Hàm update (Sửa)
+def update_trans(tid, row): supabase.table('transactions').update(row).eq('id', tid).execute()
+# Hàm xóa
+def del_trans_list(id_list): 
+    if id_list: supabase.table('transactions').delete().in_('id', id_list).execute()
+
 def add_cat(n): supabase.table('categories').insert({"ten_danh_muc": n}).execute()
 def del_cat(n): supabase.table('categories').delete().eq('ten_danh_muc', n).execute()
 
@@ -207,7 +210,6 @@ def main_app():
 
     # --- HÀM CALLBACK: LƯU & RESET ---
     def save_callback():
-        # Lấy dữ liệu từ Session State
         opt = st.session_state.w_opt
         desc_input = st.session_state.w_desc
         amt = st.session_state.w_amt
@@ -217,7 +219,6 @@ def main_app():
         ddl = st.session_state.w_date if debt else None
         note = st.session_state.w_note
 
-        # Xử lý tên
         final_desc = desc_input if opt == "➕ Mới..." else opt
 
         if amt > 0 and final_desc:
@@ -231,7 +232,7 @@ def main_app():
             add_trans(row)
             st.toast("Đã lưu thành công!", icon="✅")
             
-            # RESET FORM TẠI ĐÂY (An toàn vì nằm trong Callback)
+            # RESET FORM
             st.session_state.w_amt = 0
             st.session_state.w_desc = ""
             st.session_state.w_note = ""
@@ -245,7 +246,6 @@ def main_app():
         if st.button("🔄 Tải lại"): st.cache_data.clear(); st.rerun()
         if st.button("🔒 Đăng xuất"): st.session_state.logged_in = False; st.rerun()
 
-    # --- TABS ---
     tab1, tab2, tab3 = st.tabs(["📊 DASHBOARD", "⏳ SỔ NỢ", "⚙️ CÀI ĐẶT"])
 
     with tab1:
@@ -269,7 +269,6 @@ def main_app():
                 hist = df['muc'].unique().tolist() if not df.empty else []
                 if hist: hist.reverse()
                 
-                # Widget Nhập liệu (Có Key để Reset)
                 st.selectbox("Nội dung", ["➕ Mới..."] + hist, key="w_opt")
                 
                 if st.session_state.w_opt == "➕ Mới...":
@@ -287,7 +286,6 @@ def main_app():
                 
                 st.text_input("Note:", key="w_note")
 
-                # NÚT GỌI CALLBACK (Không cần Rerun thủ công)
                 st.button("LƯU GIAO DỊCH 🚀", type="primary", on_click=save_callback, use_container_width=True)
 
         # --- CỘT PHẢI: BIỂU ĐỒ ---
@@ -299,7 +297,6 @@ def main_app():
                     if not exp_df.empty:
                         chart_data = exp_df.groupby('phan_loai')['so_tien'].sum().reset_index()
                         
-                        # Biểu đồ trong suốt
                         base = alt.Chart(chart_data).encode(theta=alt.Theta("so_tien", stack=True))
                         pie = base.mark_arc(innerRadius=60, outerRadius=100, cornerRadius=5).encode(
                             color=alt.Color("phan_loai", scale=alt.Scale(scheme='turbo'), legend=None),
@@ -313,7 +310,6 @@ def main_app():
                         final_chart = (pie + text).properties(background='transparent').configure_view(strokeWidth=0)
                         st.altair_chart(final_chart, use_container_width=True)
                         
-                        # Danh sách chi tiết
                         st.write("---")
                         for idx, row in chart_data.sort_values('so_tien', ascending=False).iterrows():
                             st.markdown(f"""
@@ -322,17 +318,106 @@ def main_app():
                                 <span style="color: #00f2c3; font-weight: bold;">{row['so_tien']:,.0f} đ</span>
                             </div>
                             """, unsafe_allow_html=True)
-
                     else: st.info("Chưa có dữ liệu chi tiêu.")
                 else: st.info("Dữ liệu trống.")
 
         st.divider()
-        with st.expander("📜 Lịch sử (Xem/Xóa)"):
-             if not df.empty:
-                st.dataframe(df[['id', 'ngay', 'muc', 'so_tien', 'loai']].sort_values(by='id', ascending=False).head(5), use_container_width=True, hide_index=True)
-                del_id = st.selectbox("ID Xóa:", df['id'].unique(), key="del_sel")
-                if st.button("Xác nhận xóa"):
-                    del_trans(int(del_id)); st.rerun()
+
+        # --- PHẦN LỊCH SỬ THÔNG MINH (EDIT/DELETE/FILTER) ---
+        with st.container():
+            st.subheader("📅 Lịch sử & Chỉnh sửa")
+            if not df.empty:
+                # 1. BỘ LỌC NGÀY
+                col_date, col_view = st.columns([1, 2])
+                with col_date:
+                    filter_date = st.date_input("Xem ngày:", date.today())
+                with col_view:
+                    view_mode = st.radio("Chế độ:", ["Chỉ ngày này", "Tất cả"], horizontal=True)
+
+                # Lọc dữ liệu
+                if view_mode == "Chỉ ngày này":
+                    df_filtered = df[df['ngay'] == filter_date].copy()
+                else:
+                    df_filtered = df.copy()
+
+                if not df_filtered.empty:
+                    # Chuẩn bị dữ liệu cho Data Editor
+                    # Thêm cột "Xóa?" mặc định là False
+                    df_filtered['Xóa?'] = False
+                    
+                    # Cấu hình cột hiển thị
+                    edited_df = st.data_editor(
+                        df_filtered,
+                        column_config={
+                            "id": None, # Ẩn ID
+                            "ngay": st.column_config.DateColumn("Ngày", format="DD/MM/YYYY"),
+                            "muc": "Mục",
+                            "so_tien": st.column_config.NumberColumn("Số tiền", format="%d đ"),
+                            "loai": st.column_config.SelectboxColumn("Loại", options=["Thu", "Chi"]),
+                            "phan_loai": st.column_config.SelectboxColumn("Nhóm", options=st.session_state.categories),
+                            "trang_thai": st.column_config.SelectboxColumn("Status", options=["Đã xong", "Đang nợ"]),
+                            "Xóa?": st.column_config.CheckboxColumn("❌ Xóa?", help="Tick để xóa dòng này")
+                        },
+                        use_container_width=True,
+                        hide_index=True,
+                        key="history_editor"
+                    )
+
+                    # NÚT CẬP NHẬT
+                    if st.button("💾 CẬP NHẬT THAY ĐỔI", type="primary", use_container_width=True):
+                        # 1. Tìm các dòng bị đánh dấu Xóa
+                        to_delete = edited_df[edited_df['Xóa?'] == True]['id'].tolist()
+                        if to_delete:
+                            del_trans_list(to_delete)
+                            st.toast(f"Đã xóa {len(to_delete)} dòng!")
+
+                        # 2. Tìm các dòng bị Sửa (Loại trừ các dòng xóa)
+                        # So sánh edited_df với df gốc (df_filtered trước khi edit)
+                        # Tuy nhiên đơn giản nhất là cập nhật những dòng còn lại (không bị xóa)
+                        # Để tối ưu, chỉ update những dòng có thay đổi. Nhưng với Supabase upsert, ta có thể loop qua.
+                        
+                        rows_to_update = edited_df[edited_df['Xóa?'] == False]
+                        
+                        # Convert Date back to string for Supabase
+                        count_update = 0
+                        for index, row in rows_to_update.iterrows():
+                            # Lấy dòng gốc để so sánh
+                            original_row = df[df['id'] == row['id']].iloc[0]
+                            
+                            # So sánh đơn giản (nếu khác thì update)
+                            has_changed = (
+                                str(row['ngay']) != str(original_row['ngay']) or
+                                row['muc'] != original_row['muc'] or
+                                row['so_tien'] != original_row['so_tien'] or
+                                row['loai'] != original_row['loai'] or
+                                row['phan_loai'] != original_row['phan_loai'] or
+                                row['trang_thai'] != original_row['trang_thai'] or
+                                row['ghi_chu'] != original_row['ghi_chu']
+                            )
+                            
+                            if has_changed:
+                                update_data = {
+                                    "ngay": str(row['ngay']),
+                                    "muc": row['muc'],
+                                    "so_tien": row['so_tien'],
+                                    "loai": row['loai'],
+                                    "phan_loai": row['phan_loai'],
+                                    "trang_thai": row['trang_thai'],
+                                    "ghi_chu": row['ghi_chu']
+                                }
+                                update_trans(row['id'], update_data)
+                                count_update += 1
+                        
+                        if count_update > 0:
+                            st.toast(f"Đã cập nhật {count_update} dòng!")
+                        
+                        time.sleep(1)
+                        st.rerun()
+
+                else:
+                    st.info(f"Không có giao dịch nào trong ngày {filter_date.strftime('%d/%m/%Y')}")
+            else:
+                st.info("Chưa có dữ liệu.")
 
     # --- TAB 2: SỔ NỢ ---
     with tab2:
