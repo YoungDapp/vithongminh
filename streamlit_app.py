@@ -104,8 +104,7 @@ def load_css():
     """, unsafe_allow_html=True)
 load_css()
 
-# --- 3. DATABASE & LOGIC (ĐÃ THÊM PAYMENT METHODS) ---
-# BẢNG MÀU CỐ ĐỊNH
+# --- 3. DATABASE & LOGIC ---
 COLOR_PALETTE = [
     "#00f2c3", "#ff4b4b", "#f7b731", "#a55eea", "#4b7bec", 
     "#fa8231", "#2bcbba", "#eb3b5a", "#3867d6", "#8854d0",
@@ -121,7 +120,6 @@ def load_data():
         if not df.empty:
             df['ngay'] = pd.to_datetime(df['ngay'])
             df['han_tra'] = pd.to_datetime(df['han_tra'], errors='coerce').dt.date
-            # Xử lý trường hợp cột phuong_thuc chưa có (cho dữ liệu cũ)
             if 'phuong_thuc' not in df.columns:
                 df['phuong_thuc'] = "Ví tiền mặt"
         else:
@@ -131,13 +129,12 @@ def load_data():
         c = supabase.table('categories').select("*").execute()
         cats = [x['ten_danh_muc'] for x in c.data] if c.data else ["Ăn uống", "Khác"]
 
-        # 3. Load Payment Methods (NEW)
+        # 3. Load Payment Methods
         m = supabase.table('payment_methods').select("*").execute()
         methods = [x['ten_phuong_thuc'] for x in m.data] if m.data else ["Ví tiền mặt", "Tài khoản ngân hàng", "Thẻ"]
 
         return df, cats, methods
     except Exception as e:
-        # st.error(f"Lỗi data: {e}") # Uncomment để debug
         return pd.DataFrame(), [], []
 
 def add_trans(row): supabase.table('transactions').insert(row).execute()
@@ -147,11 +144,9 @@ def del_trans_list(ids): supabase.table('transactions').delete().in_('id', ids).
 def add_cat(n): supabase.table('categories').insert({"ten_danh_muc": n}).execute()
 def del_cat(n): supabase.table('categories').delete().eq('ten_danh_muc', n).execute()
 
-# Hàm quản lý Phương thức (NEW)
 def add_method(n): supabase.table('payment_methods').insert({"ten_phuong_thuc": n}).execute()
 def del_method(n): supabase.table('payment_methods').delete().eq('ten_phuong_thuc', n).execute()
 
-# Hàm tính toán KPI
 def calculate_kpis(df):
     if df.empty: return 0, 0, 0, 0, 0
     today = pd.Timestamp.now()
@@ -235,7 +230,6 @@ def main_app():
     st.session_state.categories = cats
     st.session_state.methods = methods
     
-    # Init keys
     if 'w_opt' not in st.session_state: st.session_state.w_opt = "➕ Mới..."
     if 'w_desc' not in st.session_state: st.session_state.w_desc = ""
     if 'w_amt' not in st.session_state: st.session_state.w_amt = 0
@@ -255,7 +249,7 @@ def main_app():
         
         w_type = st.session_state.get("w_type", "Chi")
         w_cat = st.session_state.get("w_cat", "Khác")
-        w_method = st.session_state.get("w_method", "Ví tiền mặt") # Lấy phương thức
+        w_method = st.session_state.get("w_method", "Ví tiền mặt")
         w_debt = st.session_state.get("w_debt", False)
         w_date = st.session_state.get("w_date", None)
         w_note = st.session_state.get("w_note", "")
@@ -265,19 +259,18 @@ def main_app():
                 "ngay": str(datetime.datetime.now()), "muc": final, "so_tien": amt,
                 "loai": "Thu" if "Thu" in w_type else "Chi",
                 "phan_loai": w_cat,
-                "phuong_thuc": w_method, # Lưu phương thức
+                "phuong_thuc": w_method,
                 "han_tra": str(w_date) if w_debt else None,
                 "trang_thai": "Đang nợ" if w_debt else "Đã xong",
                 "ghi_chu": w_note
             }
             add_trans(row)
             
-            # Cập nhật ghi nhớ phương thức
+            # Cập nhật last_method
             st.session_state.last_method = w_method
             
             st.toast("Đã lưu!", icon="✨")
             
-            # Reset Form
             st.session_state.w_amt = 0
             if "w_desc" in st.session_state: st.session_state.w_desc = ""
             if "w_note" in st.session_state: st.session_state.w_note = ""
@@ -293,7 +286,7 @@ def main_app():
     tab1, tab2, tab3 = st.tabs(["📊 TỔNG QUAN", "⏳ SỔ NỢ", "⚙️ CÀI ĐẶT"])
 
     with tab1:
-        # KPI Cards
+        # KPI
         inc, exp, bal, pi, pe = calculate_kpis(df)
         ci = "text-green" if pi>=0 else "text-red"
         icon_i = "↗" if pi>=0 else "↘"
@@ -306,7 +299,7 @@ def main_app():
         with c3: st.markdown(f'<div class="metric-card card-balance"><div class="metric-label">Số Dư</div><div class="metric-value text-purple">{bal:,.0f}</div><div class="metric-delta" style="color:#aaa">Cashflow</div></div>', unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # --- PHẦN 2: NHẬP & CHART ---
+        # --- NHẬP & CHART ---
         c_left, c_right = st.columns([1, 1.6], gap="large")
         with c_left:
             with st.container():
@@ -315,13 +308,17 @@ def main_app():
                 if hist: hist.reverse()
                 st.selectbox("Nội dung", ["➕ Mới..."] + hist, key="w_opt")
                 if st.session_state.w_opt == "➕ Mới...": st.text_input("Tên mục:", key="w_desc")
+                
+                # --- SỐ TIỀN VỚI FORMATTING PREVIEW ---
                 st.number_input("Số tiền:", step=50000, key="w_amt")
+                if st.session_state.w_amt > 0:
+                    st.caption(f"💡 {st.session_state.w_amt:,.0f} VNĐ") # Preview định dạng số
                 
                 c1, c2 = st.columns(2)
                 with c1: st.radio("Loại:", ["Chi tiền", "Thu tiền"], key="w_type")
                 with c2: st.selectbox("Nhóm:", st.session_state.categories, key="w_cat")
                 
-                # Selectbox Phương Thức (Có nhớ giá trị cũ)
+                # Selectbox Phương Thức (Nhớ giá trị cũ)
                 try:
                     idx = st.session_state.methods.index(st.session_state.last_method)
                 except: idx = 0
@@ -336,7 +333,7 @@ def main_app():
             with st.container():
                 st.subheader("📊 Phân Tích")
                 if not df.empty:
-                    # Thêm tab "Nguồn Tiền" (NEW)
+                    # Tab Nguồn Tiền Theo Phương Án 1 (Tách dòng tiền vào/ra)
                     tab_chi, tab_thu, tab_nguon = st.tabs(["📉 Chi Tiêu", "📈 Thu Nhập", "💳 Nguồn Tiền"])
                     
                     # Hàm vẽ biểu đồ đồng bộ màu sắc
@@ -345,6 +342,7 @@ def main_app():
                             chart_data = sub_df.groupby(group_col)['so_tien'].sum().reset_index()
                             
                             unique_cats = chart_data[group_col].unique()
+                            # Color matching
                             color_map = {cat: COLOR_PALETTE[i % len(COLOR_PALETTE)] for i, cat in enumerate(unique_cats)}
                             
                             base = alt.Chart(chart_data).encode(theta=alt.Theta("so_tien", stack=True))
@@ -367,14 +365,22 @@ def main_app():
 
                     with tab_chi: draw_chart(df[df['loai']=='Chi'], 'phan_loai', 'turbo')
                     with tab_thu: draw_chart(df[df['loai']=='Thu'], 'phan_loai', 'greens')
-                    # Biểu đồ Nguồn tiền (NEW)
-                    with tab_nguon: draw_chart(df, 'phuong_thuc', 'plasma')
+                    
+                    # TAB NGUỒN TIỀN (Phương án 1 - Tách biệt)
+                    with tab_nguon:
+                        col_in, col_out = st.columns(2)
+                        with col_in:
+                            st.markdown("##### 📥 Tiền Vào (Thu)")
+                            draw_chart(df[df['loai']=='Thu'], 'phuong_thuc', 'greens')
+                        with col_out:
+                            st.markdown("##### 📤 Tiền Ra (Chi)")
+                            draw_chart(df[df['loai']=='Chi'], 'phuong_thuc', 'reds')
 
                 else: st.info("Trống.")
 
         st.divider()
         
-        # --- PHẦN 3: SMART HISTORY ---
+        # --- SMART HISTORY (EXPANDER) ---
         with st.expander("📅 Lịch sử & Chỉnh sửa (Click để xem)", expanded=False):
             if not df.empty:
                 c_d, c_v = st.columns([1,2])
@@ -394,7 +400,6 @@ def main_app():
                             "so_tien": st.column_config.NumberColumn("Số tiền", format="%d"),
                             "loai": st.column_config.SelectboxColumn("Loại", options=["Thu", "Chi"]),
                             "phan_loai": st.column_config.SelectboxColumn("Nhóm", options=st.session_state.categories),
-                            # Thêm cột Phương Thức vào bảng Edit
                             "phuong_thuc": st.column_config.SelectboxColumn("Ví/Thẻ", options=st.session_state.methods),
                             "trang_thai": st.column_config.SelectboxColumn("Status", options=["Đã xong", "Đang nợ"]),
                             "Xóa": st.column_config.CheckboxColumn("❌ Xóa", default=False)
@@ -403,19 +408,16 @@ def main_app():
                     )
                     
                     if st.button("💾 CẬP NHẬT THAY ĐỔI", type="primary", use_container_width=True):
-                        # Xóa
                         to_del = edited[edited['Xóa']==True]['id'].tolist()
                         if to_del: del_trans_list(to_del); st.toast(f"Đã xóa {len(to_del)} dòng")
                         
-                        # Sửa
                         to_upd = edited[edited['Xóa']==False]
                         cnt = 0
                         for i, r in to_upd.iterrows():
                             org = df[df['id']==r['id']].iloc[0]
-                            # Thêm check so sánh cột phuong_thuc
                             if (str(r['ngay']) != str(org['ngay']) or r['muc'] != org['muc'] or 
                                 r['so_tien'] != org['so_tien'] or r['loai'] != org['loai'] or 
-                                r['phan_loai'] != org['phan_loai'] or r['phuong_thuc'] != org.get('phuong_thuc', 'Ví tiền mặt') or 
+                                r['phan_loai'] != org['phan_loai'] or r['phuong_thuc'] != org.get('phuong_thuc', '') or
                                 r['trang_thai'] != org['trang_thai'] or r['ghi_chu'] != org['ghi_chu']):
                                 
                                 update_trans(r['id'], {
@@ -444,8 +446,6 @@ def main_app():
 
     with tab3:
         st.subheader("Cài đặt")
-        
-        # Quản lý Danh mục
         c1, c2 = st.columns(2)
         with c1: 
             n = st.text_input("Thêm danh mục:")
@@ -456,8 +456,6 @@ def main_app():
             
         st.divider()
         st.markdown("### 💳 Quản lý Phương Thức Thanh Toán")
-        
-        # Quản lý Phương thức (NEW)
         c3, c4 = st.columns(2)
         with c3: 
             nm = st.text_input("Thêm phương thức (Ví, Thẻ...):")
