@@ -6,12 +6,12 @@ from datetime import date
 import json
 import time
 from supabase import create_client, Client
+import os
 
 # --- 1. CẤU HÌNH TRANG ---
-st.set_page_config(page_title="SmartWallet Cloud", layout="wide", page_icon="☁️")
+st.set_page_config(page_title="SmartWallet '25", layout="wide", page_icon="⚡")
 
-# --- 2. KẾT NỐI SUPABASE ---
-# Lấy key từ Streamlit Secrets
+# --- 2. KẾT NỐI SUPABASE (GIỮ NGUYÊN) ---
 try:
     url = st.secrets["supabase"]["SUPABASE_URL"]
     key = st.secrets["supabase"]["SUPABASE_KEY"]
@@ -20,55 +20,183 @@ except Exception as e:
     st.error("❌ Chưa cấu hình Supabase Secret! Vào Settings trên Streamlit Cloud để thêm.")
     st.stop()
 
-# --- 3. CSS UI (GIỮ NGUYÊN) ---
+# --- 3. SIÊU CSS: NEON TEAL + DEEP PURPLE + FROSTED GLASS ---
 def load_css():
     st.markdown("""
     <style>
-        .stApp { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
-        div[data-testid="stMetric"] {
-            background-color: #ffffff; border-left: 5px solid #4CAF50;
-            padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        /* --- TỔNG THỂ --- */
+        /* Nền Deep Purple Gradient */
+        .stApp {
+            background: linear-gradient(145deg, #0f0c29, #302b63, #24243e);
+            color: #e0e0ff; /* Màu chữ sáng hơi xanh */
+            font-family: 'Inter', sans-serif; /* Gợi ý font hiện đại (nếu máy có) */
         }
-        .stButton button { border-radius: 20px; font-weight: 600; }
+        
+        /* Ẩn Header mặc định của Streamlit */
+        header[data-testid="stHeader"] {
+            visibility: hidden;
+        }
+
+        /* --- HIỆU ỨNG KÍNH MỜ (GLASSMORPHISM) --- */
+        /* Áp dụng cho Sidebar và các Container chính */
+        section[data-testid="stSidebar"],
+        div[data-testid="stVerticalBlock"] > div.stContainer {
+            background: rgba(255, 255, 255, 0.03) !important; /* Nền siêu trong suốt */
+            backdrop-filter: blur(12px); /* Hiệu ứng mờ kính */
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08); /* Viền kính mỏng */
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3); /* Đổ bóng sâu */
+            border-radius: 16px;
+        }
+        
+        /* Sidebar cụ thể */
+        section[data-testid="stSidebar"] {
+            border-right: 1px solid rgba(0, 242, 195, 0.1); /* Viền phải hơi xanh */
+        }
+
+        /* --- CÁC THẺ SỐ LIỆU (METRIC CARDS) --- */
+        div[data-testid="stMetric"] {
+            background: rgba(0, 0, 0, 0.2) !important;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 242, 195, 0.3); /* Viền Neon Teal */
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 0 15px rgba(0, 242, 195, 0.1); /* Glow nhẹ */
+            transition: transform 0.3s ease;
+        }
+        div[data-testid="stMetric"]:hover {
+            transform: translateY(-5px); /* Hiệu ứng nổi khi di chuột */
+            box-shadow: 0 0 20px rgba(0, 242, 195, 0.3);
+        }
+        /* Màu chữ label và giá trị */
+        div[data-testid="stMetricLabel"] label { color: #a0a0c0 !important; }
+        div[data-testid="stMetricValue"] {
+            color: #00f2c3 !important; /* Màu Neon Teal */
+            text-shadow: 0 0 10px rgba(0, 242, 195, 0.5); /* Chữ phát sáng */
+            font-weight: 800;
+        }
+
+        /* --- INPUTS & WIDGETS (STYLE FIGMA DARK MODE) --- */
+        /* Các ô nhập liệu, selectbox */
+        .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] > div, .stDateInput input, .stTextArea textarea {
+            background-color: rgba(0, 0, 0, 0.2) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 10px !important;
+        }
+        /* Khi click vào (Focus) -> Viền Neon Teal phát sáng */
+        .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox div[data-baseweb="select"] > div:focus-within {
+            border-color: #00f2c3 !important;
+            box-shadow: 0 0 10px rgba(0, 242, 195, 0.4) !important;
+        }
+        /* Checkbox và Radio */
+        .stCheckbox span, .stRadio span { color: #e0e0ff !important; }
+
+        /* --- NÚT BẤM (NEON BUTTONS) --- */
+        .stButton button {
+            border-radius: 12px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+        }
+        /* Nút chính (Primary - Lưu) */
         .stButton button[kind="primary"] {
-            background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%); border: none;
+            background: linear-gradient(90deg, #00f2c3, #00c9a7) !important; /* Gradient Teal */
+            color: #0f0c29 !important; /* Chữ màu tối tương phản */
+            border: none !important;
+            box-shadow: 0 0 15px rgba(0, 242, 195, 0.5); /* Neon Glow */
+        }
+        .stButton button[kind="primary"]:hover {
+            box-shadow: 0 0 25px rgba(0, 242, 195, 0.8);
+            transform: scale(1.02);
+        }
+        /* Nút phụ (Secondary - Xóa, Đăng xuất) */
+        .stButton button[kind="secondary"] {
+            background: transparent !important;
+            border: 2px solid #ff4b4b !important;
+            color: #ff4b4b !important;
+        }
+        .stButton button[kind="secondary"]:hover {
+            background: #ff4b4b !important;
+            color: white !important;
+            box-shadow: 0 0 15px rgba(255, 75, 75, 0.5);
+        }
+
+        /* --- TABS (STYLE ARC BROWSER) --- */
+        .stTabs [data-baseweb="tab-list"] {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 8px;
+            border-radius: 20px;
+            gap: 5px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 15px;
+            border: none !important;
+            color: #a0a0c0;
+            padding: 8px 16px;
+        }
+        /* Tab đang chọn */
+        .stTabs [aria-selected="true"] {
+            background-color: rgba(0, 242, 195, 0.15) !important;
+            color: #00f2c3 !important;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 242, 195, 0.2);
+        }
+
+        /* --- CÁC THÀNH PHẦN KHÁC --- */
+        /* Tiêu đề */
+        h1, h2, h3 {
+            color: #ffffff !important;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        h1 span {
+            background: linear-gradient(90deg, #00f2c3, #a700f2); /* Gradient chữ tiêu đề */
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        /* Đường kẻ phân cách */
+        hr { border-color: rgba(0, 242, 195, 0.2) !important; }
+        /* Expander (Khung mở rộng) */
+        .streamlit-expanderHeader {
+            background-color: rgba(255,255,255,0.05) !important;
+            color: #00f2c3 !important;
+            border-radius: 10px;
+        }
+        /* Bảng dữ liệu */
+        div[data-testid="stDataFrame"] {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
         }
     </style>
     """, unsafe_allow_html=True)
 load_css()
 
-# --- 4. HÀM XỬ LÝ DỮ LIỆU (SUPABASE) ---
-
-# @st.cache_data(ttl=60) # Cache 60s để đỡ load lại liên tục, bỏ comment nếu muốn nhanh hơn
+# --- 4. HÀM XỬ LÝ DỮ LIỆU (SUPABASE - GIỮ NGUYÊN) ---
+# @st.cache_data(ttl=60)
 def load_data():
     """Tải dữ liệu từ Supabase về DataFrame"""
     try:
-        # 1. Lấy Giao dịch
         response = supabase.table('transactions').select("*").execute()
         df = pd.DataFrame(response.data)
-        
         if not df.empty:
             df['ngay'] = pd.to_datetime(df['ngay']).dt.date
             df['han_tra'] = pd.to_datetime(df['han_tra'], errors='coerce').dt.date
         else:
-            # Tạo khung rỗng nếu chưa có dữ liệu
             df = pd.DataFrame(columns=['id', 'ngay', 'muc', 'so_tien', 'loai', 'phan_loai', 'han_tra', 'trang_thai', 'ghi_chu'])
 
-        # 2. Lấy Danh mục
         cat_res = supabase.table('categories').select("*").execute()
         cats_df = pd.DataFrame(cat_res.data)
         if not cats_df.empty:
             cats = cats_df['ten_danh_muc'].tolist()
         else:
-            cats = ["Ăn uống", "Khác"] # Mặc định
-            
+            cats = ["Ăn uống", "Khác"]
         return df, cats
     except Exception as e:
         st.error(f"Lỗi tải dữ liệu: {e}")
         return pd.DataFrame(), []
 
 def add_transaction_db(row_dict):
-    """Thêm giao dịch mới vào Supabase"""
     try:
         supabase.table('transactions').insert(row_dict).execute()
         return True
@@ -77,7 +205,6 @@ def add_transaction_db(row_dict):
         return False
 
 def delete_transaction_db(ids_to_delete):
-    """Xóa giao dịch theo ID"""
     try:
         for _id in ids_to_delete:
             supabase.table('transactions').delete().eq('id', _id).execute()
@@ -100,9 +227,7 @@ def delete_category_db(cat_name):
     except:
         return False
 
-# --- 5. HỆ THỐNG BẢO MẬT (MÃ PIN LOCAL) ---
-# Mã PIN này vẫn lưu Local Storage của trình duyệt/file tạm. 
-# Để bảo mật tuyệt đối, bạn có thể lưu mã PIN lên Supabase luôn, nhưng ở đây ta giữ đơn giản.
+# --- 5. HỆ THỐNG BẢO MẬT (GIỮ NGUYÊN LOCAL PIN) ---
 CONFIG_FILE = "config.json"
 def login_system():
     if "logged_in" not in st.session_state: st.session_state.logged_in = False
@@ -110,54 +235,59 @@ def login_system():
 
     col1, col2, col3 = st.columns([1,1,1])
     with col2:
-        st.markdown("<br><h2 style='text-align: center;'>🔐 Ví Cloud</h2>", unsafe_allow_html=True)
-        if not os.path.exists(CONFIG_FILE):
-            st.warning("Thiết lập mã PIN lần đầu.")
-            with st.form("setup"):
-                p1 = st.text_input("PIN mới", type="password", max_chars=4)
-                if st.form_submit_button("Lưu"):
-                    with open(CONFIG_FILE, "w") as f: json.dump({"pin": p1}, f)
-                    st.rerun()
-        else:
-            with st.form("login"):
-                pin = st.text_input("Nhập PIN", type="password", max_chars=4)
-                if st.form_submit_button("Mở khóa", type="primary"):
-                    with open(CONFIG_FILE, "r") as f: stored = json.load(f).get("pin")
-                    if pin == stored:
-                        st.session_state.logged_in = True
-                        st.rerun()
-                    else:
-                        st.error("Sai mã PIN")
+        # Bọc form login vào container kính mờ
+        with st.container():
+            st.markdown("<br><h1 style='text-align: center;'>🔐 Z-Wallet</h1>", unsafe_allow_html=True)
+            if not os.path.exists(CONFIG_FILE):
+                st.warning("⚡ Setup PIN bảo mật (4 số)")
+                with st.form("setup"):
+                    p1 = st.text_input("PIN mới", type="password", max_chars=4)
+                    if st.form_submit_button("KHỞI TẠO", type="primary"):
+                        if len(p1) == 4 and p1.isdigit():
+                            with open(CONFIG_FILE, "w") as f: json.dump({"pin": p1}, f)
+                            st.rerun()
+                        else: st.error("PIN phải là 4 chữ số!")
+            else:
+                with st.form("login"):
+                    pin = st.text_input("Nhập PIN để truy cập", type="password", max_chars=4)
+                    if st.form_submit_button("🚀 TRUY CẬP NGAY", type="primary"):
+                        with open(CONFIG_FILE, "r") as f: stored = json.load(f).get("pin")
+                        if pin == stored:
+                            st.session_state.logged_in = True
+                            st.rerun()
+                        else:
+                            st.error("Sai mã PIN!")
     st.stop()
 
-# --- 6. APP CHÍNH ---
-import os # Import lại để tránh lỗi
+# --- 6. APP CHÍNH (GIAO DIỆN MỚI) ---
+import os
 
 def main_app():
     # Sidebar
     with st.sidebar:
-        st.title("☁️ Quản lý Ví")
-        if st.button("🔄 Tải lại dữ liệu"):
-            st.cache_data.clear() # Xóa cache để load mới
+        st.title("⚡ SmartWallet '25")
+        st.caption("Cyberpunk Finance Manager")
+        st.divider()
+        if st.button("🔄 TẢI LẠI DỮ LIỆU", use_container_width=True):
+            st.cache_data.clear()
             st.rerun()
-        if st.button("🔒 Đăng xuất"):
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔒 KHÓA ỨNG DỤNG", type="secondary", use_container_width=True):
             st.session_state.logged_in = False
             st.rerun()
 
-    # Load dữ liệu (Chạy mỗi khi reload trang)
+    # Load dữ liệu
     df, categories = load_data()
-    st.session_state.categories = categories # Lưu vào session để dùng ở selectbox
+    st.session_state.categories = categories
 
-    # --- CALLBACKS ---
+    # --- CALLBACKS (GIỮ NGUYÊN) ---
     def save_callback():
-        # Lấy an toàn
         amt = st.session_state.get("w_amt", 0)
         desc_opt = st.session_state.get("w_opt", "")
         new_desc = st.session_state.get("w_desc", "")
         final_desc = new_desc if desc_opt == "➕ Mục mới..." else desc_opt
 
         if amt > 0 and final_desc:
-            # Chuẩn bị dữ liệu gửi lên Supabase
             is_debt = st.session_state.get("w_debt", False)
             row_data = {
                 "ngay": str(date.today()),
@@ -172,16 +302,17 @@ def main_app():
             
             if add_transaction_db(row_data):
                 st.toast("Đã lưu lên Cloud!", icon="☁️")
-                # Reset form
                 st.session_state.w_amt = 0
                 if "w_desc" in st.session_state: st.session_state.w_desc = ""
                 st.session_state.w_opt = "➕ Mục mới..."
-                time.sleep(1)
-                st.rerun() # Reload để bảng cập nhật dòng mới
+                time.sleep(0.5)
+                st.rerun()
         else:
             st.toast("Thiếu thông tin!", icon="⚠️")
 
-    # --- UI ---
+    # --- UI CHÍNH ---
+    st.title("Tổng Quan Tài Chính")
+
     tab1, tab2, tab3 = st.tabs(["📊 DASHBOARD", "⏳ SỔ NỢ", "⚙️ CÀI ĐẶT"])
 
     with tab1:
@@ -191,76 +322,137 @@ def main_app():
             exp = df[df['loai']=='Chi']['so_tien'].sum()
             bal = inc - exp
             c1, c2, c3 = st.columns(3)
-            c1.metric("Tổng Thu", f"{inc:,.0f}")
-            c2.metric("Tổng Chi", f"{exp:,.0f}")
-            c3.metric("Số Dư", f"{bal:,.0f}")
+            c1.metric("Tổng Thu Nhập", f"{inc:,.0f}", delta="Tháng này")
+            c2.metric("Tổng Chi Tiêu", f"{exp:,.0f}", delta="Tháng này", delta_color="inverse")
+            c3.metric("Số Dư Khả Dụng", f"{bal:,.0f}", delta="Cashflow")
         
         st.divider()
+        
+        # Layout 2 cột: Nhập liệu & Biểu đồ
+        # Sử dụng st.container() để áp dụng hiệu ứng kính mờ cho từng khối
         c_left, c_right = st.columns([1, 1.5], gap="medium")
         
         with c_left:
-            with st.container(border=True):
-                st.subheader("📝 Nhập liệu")
+            with st.container(): # Khối kính mờ bên trái
+                st.subheader("📝 Nhập Giao Dịch Mới")
                 
-                # Logic chọn
                 hist = df['muc'].unique().tolist() if not df.empty else []
                 if hist: hist.reverse()
                 st.selectbox("Nội dung", ["➕ Mục mới..."] + hist, key="w_opt")
                 
                 if st.session_state.w_opt == "➕ Mục mới...":
-                    st.text_input("Tên mục:", key="w_desc")
+                    st.text_input("Tên mục chi tiêu:", key="w_desc", placeholder="VD: Trà sữa full topping...")
                 
-                st.number_input("Số tiền:", step=50000, key="w_amt")
+                st.number_input("Số tiền (VNĐ):", step=50000, key="w_amt")
                 
                 c1, c2 = st.columns(2)
                 with c1: st.radio("Loại:", ["Chi tiền", "Thu tiền"], key="w_type")
                 with c2: st.selectbox("Nhóm:", st.session_state.categories, key="w_cat")
                 
-                st.checkbox("Vay/Nợ?", key="w_debt")
-                if st.session_state.get("w_debt"): st.date_input("Hạn:", key="w_date")
+                st.checkbox("Đánh dấu là Vay/Nợ?", key="w_debt")
+                if st.session_state.get("w_debt"): st.date_input("Hạn xử lý:", key="w_date")
                 st.text_input("Ghi chú:", key="w_note")
                 
-                st.button("LƯU LÊN CLOUD", type="primary", on_click=save_callback, use_container_width=True)
+                st.button("LƯU LÊN CLOUD 🚀", type="primary", on_click=save_callback, use_container_width=True)
 
         with c_right:
-            st.subheader("📜 Lịch sử gần đây")
-            if not df.empty:
-                # Hiển thị bảng rút gọn
+            with st.container(): # Khối kính mờ bên phải
+                st.subheader("📈 Phân Tích Chi Tiêu")
+                if not df.empty:
+                    exp_df = df[(df['loai']=='Chi') & (df['phan_loai']!='Cho vay')]
+                    if not exp_df.empty:
+                        chart_data = exp_df.groupby('phan_loai')['so_tien'].sum().reset_index()
+                        
+                        # Biểu đồ tròn Neon
+                        base = alt.Chart(chart_data).encode(theta=alt.Theta("so_tien", stack=True))
+                        pie = base.mark_arc(innerRadius=70, outerRadius=110, cornerRadius=8).encode(
+                            color=alt.Color("phan_loai", scale=alt.Scale(scheme='turbo'), legend=None), # Dùng màu rực rỡ
+                            order=alt.Order("so_tien", sort="descending"),
+                            tooltip=["phan_loai", alt.Tooltip("so_tien", format=",.0f")]
+                        )
+                        text = base.mark_text(radius=130, fill="#00f2c3").encode(
+                            text=alt.Text("so_tien", format=",.0f"),
+                            order=alt.Order("so_tien", sort="descending")  
+                        )
+                        st.altair_chart(pie + text, use_container_width=True)
+                        
+                        # Legend tùy chỉnh bên dưới
+                        st.write("Chi tiết nhóm:")
+                        st.dataframe(chart_data.sort_values('so_tien', ascending=False).set_index('phan_loai'), use_container_width=True)
+
+                    else:
+                        st.info("Chưa có dữ liệu chi tiêu để phân tích.")
+                else: st.info("Dữ liệu trống.")
+        
+        st.divider()
+        
+        with st.expander("📜 Lịch sử giao dịch gần đây (Nhấn để xem/xóa)"):
+             if not df.empty:
                 st.dataframe(
-                    df[['ngay', 'muc', 'so_tien', 'loai', 'phan_loai']].sort_values(by='ngay', ascending=False).head(10),
+                    df[['id','ngay', 'muc', 'so_tien', 'loai', 'phan_loai']].sort_values(by='id', ascending=False).head(10),
                     use_container_width=True, hide_index=True
                 )
-                
-                # Nút xóa
-                with st.expander("🗑 Xóa giao dịch"):
-                    del_id = st.selectbox("Chọn giao dịch để xóa:", df.sort_values(by='id', ascending=False)['id'].astype(str) + " - " + df['muc'], key="del_select")
-                    if st.button("Xóa vĩnh viễn"):
-                        real_id = int(del_id.split(" - ")[0])
-                        if delete_transaction_db([real_id]):
-                            st.success("Đã xóa!")
-                            time.sleep(1)
-                            st.rerun()
+                del_id = st.selectbox("Chọn ID để xóa vĩnh viễn:", ["--Chọn--"] + df.sort_values(by='id', ascending=False)['id'].astype(str).tolist(), key="del_select")
+                if del_id != "--Chọn--" and st.button("Xác nhận xóa", type="secondary"):
+                    if delete_transaction_db([int(del_id)]):
+                        st.success(f"Đã xóa ID {del_id}!")
+                        time.sleep(1)
+                        st.rerun()
 
     with tab2:
-        st.subheader("Quản lý Nợ")
-        if not df.empty:
-            debt_df = df[df['trang_thai'] == 'Đang nợ']
-            if not debt_df.empty:
-                st.dataframe(debt_df, use_container_width=True)
-            else:
-                st.success("Không có khoản nợ nào.")
+        with st.container():
+            st.subheader("Quản lý Vay & Nợ")
+            if not df.empty:
+                debt_df = df[df['trang_thai'] == 'Đang nợ']
+                if not debt_df.empty:
+                    # Hiển thị dạng thẻ bài (Cards) thay vì bảng
+                    for i, row in debt_df.iterrows():
+                        bg_color = "rgba(255, 75, 75, 0.1)" if row['loai'] == 'Thu' else "rgba(0, 242, 195, 0.1)"
+                        border_color = "#ff4b4b" if row['loai'] == 'Thu' else "#00f2c3"
+                        icon = "💸" if row['loai'] == 'Thu' else "💰"
+                        title = "MÌNH NỢ HỌ (Phải trả)" if row['loai'] == 'Thu' else "HỌ NỢ MÌNH (Phải thu)"
+                        
+                        st.markdown(f"""
+                        <div style="background: {bg_color}; border-left: 5px solid {border_color}; padding: 15px; border-radius: 12px; margin-bottom: 10px; backdrop-filter: blur(5px);">
+                            <h4 style="margin: 0; color: {border_color};">{icon} {title}</h4>
+                            <p style="font-size: 1.2em; font-weight: bold; margin: 5px 0;">{row['muc']} - {row['so_tien']:,} đ</p>
+                            <p style="margin: 0; opacity: 0.8;">📅 Hạn: {row['han_tra']} | 📝 Note: {row['ghi_chu']}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                    st.divider()
+                    st.write("Cập nhật trạng thái (Chọn dòng và sửa 'trang_thai' thành 'Đã xong'):")
+                    edited_debt = st.data_editor(
+                        debt_df[['id', 'ngay', 'muc', 'so_tien', 'loai', 'trang_thai']],
+                        column_config={
+                            "trang_thai": st.column_config.SelectboxColumn(options=["Đang nợ", "Đã xong"], required=True)
+                        },
+                        use_container_width=True, hide_index=True, key="debt_editor"
+                    )
+                    # Logic cập nhật trạng thái nợ (Cần viết thêm hàm update DB nếu muốn hoàn thiện phần này)
+                    st.caption("Tính năng cập nhật trực tiếp trạng thái nợ trên DB đang được phát triển trong phiên bản tới.")
+
+                else:
+                    st.success("Tuyệt vời! Không có khoản nợ nào.")
 
     with tab3:
-        st.write("Quản lý Danh mục (Lưu trên Server)")
-        c1, c2 = st.columns(2)
-        with c1:
-            new_c = st.text_input("Thêm danh mục:")
-            if st.button("Thêm"):
-                if add_category_db(new_c): st.rerun()
-        with c2:
-            del_c = st.selectbox("Xóa danh mục:", st.session_state.categories)
-            if st.button("Xóa"):
-                if delete_category_db(del_c): st.rerun()
+         with st.container():
+            st.subheader("Cấu hình Danh mục (Lưu trên Server)")
+            c1, c2 = st.columns(2, gap="large")
+            with c1:
+                st.write("Thêm danh mục mới:")
+                new_c = st.text_input("Tên danh mục:", placeholder="VD: Đầu tư crypto...")
+                if st.button("✅ Thêm", use_container_width=True):
+                    if add_category_db(new_c): st.rerun()
+            with c2:
+                st.write("Xóa danh mục hiện có:")
+                del_c = st.selectbox("Chọn để xóa:", st.session_state.categories)
+                if st.button("🗑 Xóa bỏ", type="secondary", use_container_width=True):
+                    if delete_category_db(del_c): st.rerun()
+            
+            st.divider()
+            st.write("Danh sách hiện tại:")
+            st.write(st.session_state.categories)
 
 # Chạy App
 login_system()
