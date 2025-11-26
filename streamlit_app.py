@@ -227,36 +227,64 @@ def delete_category_db(cat_name):
     except:
         return False
 
-# --- 5. HỆ THỐNG BẢO MẬT (KEYPAD STYLE - CHỐNG GOOGLE AUTOFILL) ---
+# --- 5. HỆ THỐNG BẢO MẬT (MOBILE FIRST KEYPAD) ---
 def login_system():
-    # CSS riêng cho bàn phím số
+    # CSS: Ép nút thành hình tròn hoàn hảo và căn giữa
     st.markdown("""
     <style>
-        /* Nút bấm bàn phím số */
-        .keypad-btn button {
-            background: rgba(255, 255, 255, 0.1) !important;
-            border: 1px solid rgba(0, 242, 195, 0.2) !important;
-            color: #ffffff !important;
-            font-size: 24px !important;
-            height: 60px !important;
-            border-radius: 50% !important; /* Hình tròn */
-            transition: all 0.2s;
+        /* Container cho bàn phím số để giới hạn chiều rộng trên Desktop */
+        .keypad-container {
+            max_width: 350px; /* Chỉ rộng tối đa 350px (cỡ màn hình đt) */
+            margin: 0 auto;   /* Căn giữa màn hình */
+            padding-bottom: 20px;
         }
-        .keypad-btn button:hover {
+        
+        /* Chỉnh nút bấm thành hình tròn tuyệt đối */
+        div.stButton > button {
+            width: 70px !important;  /* Chiều rộng cố định */
+            height: 70px !important; /* Chiều cao = Chiều rộng -> Hình tròn */
+            border-radius: 50% !important; 
+            font-size: 24px !important;
+            font-weight: bold !important;
+            margin: 8px auto !important; /* Căn giữa nút trong cột */
+            padding: 0 !important;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            
+            /* Màu sắc Glassmorphism */
+            background: rgba(255, 255, 255, 0.08) !important;
+            border: 1px solid rgba(0, 242, 195, 0.3) !important;
+            color: white !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important;
+            transition: all 0.1s;
+        }
+        
+        /* Hiệu ứng khi bấm (Active) */
+        div.stButton > button:active {
+            transform: scale(0.9);
             background: rgba(0, 242, 195, 0.2) !important;
             border-color: #00f2c3 !important;
-            transform: scale(1.1);
         }
-        /* Màn hình hiển thị chấm tròn */
-        .pin-display {
-            font-size: 40px;
-            letter-spacing: 15px;
-            color: #00f2c3;
-            text-align: center;
-            height: 60px;
-            margin-bottom: 20px;
-            text-shadow: 0 0 10px #00f2c3;
-            font-family: monospace;
+
+        /* Màn hình hiển thị PIN */
+        .pin-screen {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            height: 40px;
+        }
+        .dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #00f2c3;
+            transition: all 0.2s;
+        }
+        .dot.filled {
+            background-color: #00f2c3;
+            box-shadow: 0 0 10px #00f2c3;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -264,140 +292,91 @@ def login_system():
     if "logged_in" not in st.session_state: st.session_state.logged_in = False
     if st.session_state.logged_in: return True
 
-    # Biến lưu tạm PIN đang nhập (buffer)
     if "pin_buffer" not in st.session_state: st.session_state.pin_buffer = ""
 
-    col1, col2, col3 = st.columns([1,1,1])
-    with col2:
-        with st.container():
-            st.markdown("<br><h1 style='text-align: center;'>🔐 SmartWallet</h1>", unsafe_allow_html=True)
-            
-            # --- LOGIC XỬ LÝ PIN ---
-            def get_pin_db():
-                try:
-                    res = supabase.table('app_config').select("value").eq("key", "user_pin").execute()
-                    return res.data[0]['value'] if res.data else None
-                except: return None
+    # Dùng columns để gom gọn giao diện lại ở giữa màn hình
+    _, col_center, _ = st.columns([1, 8, 1]) 
+    
+    with col_center:
+        st.markdown("<br><br><h1 style='text-align: center;'>🔐 Z-Wallet</h1>", unsafe_allow_html=True)
+        
+        # --- LOGIC SUPABASE ---
+        def get_pin_db():
+            try:
+                res = supabase.table('app_config').select("value").eq("key", "user_pin").execute()
+                return res.data[0]['value'] if res.data else None
+            except: return None
 
-            def set_pin_db(val):
-                supabase.table('app_config').upsert({"key": "user_pin", "value": val}).execute()
+        def set_pin_db(val):
+            supabase.table('app_config').upsert({"key": "user_pin", "value": val}).execute()
 
-            stored_pin = get_pin_db()
+        stored_pin = get_pin_db()
 
-            # --- MÀN HÌNH HIỂN THỊ DOTS (● ● ● ●) ---
-            # Chỉ hiển thị chấm tròn, không dùng input field -> Chrome không thể điền vào đây
-            dots = "●" * len(st.session_state.pin_buffer)
-            if len(st.session_state.pin_buffer) == 0:
-                display_text = "_" # Placeholder
-            else:
-                display_text = dots
-            
-            st.markdown(f"<div class='pin-display'>{display_text}</div>", unsafe_allow_html=True)
+        # --- MÀN HÌNH CHẤM TRÒN (DOTS UI) ---
+        # Tạo HTML hiển thị các chấm tròn thay vì text
+        buffer_len = len(st.session_state.pin_buffer)
+        dots_html = "".join([f'<div class="dot {"filled" if i < buffer_len else ""}"></div>' for i in range(4)])
+        
+        st.markdown(f'<div class="pin-screen">{dots_html}</div>', unsafe_allow_html=True)
 
-            # --- THÔNG BÁO TRẠNG THÁI ---
+        if stored_pin is None:
+            st.info("🆕 Tạo mã PIN mới")
+        
+        # --- BÀN PHÍM SỐ (KEYPAD) ---
+        # Đặt trong container css để giới hạn chiều rộng
+        st.markdown('<div class="keypad-container">', unsafe_allow_html=True)
+        
+        # Logic bấm
+        def add(d):
+            if len(st.session_state.pin_buffer) < 4: st.session_state.pin_buffer += d
+        def delete():
+            st.session_state.pin_buffer = st.session_state.pin_buffer[:-1]
+        def clear():
+            st.session_state.pin_buffer = ""
+
+        # Lưới 3 cột chuẩn cho mobile
+        k1, k2, k3 = st.columns(3)
+        
+        with k1: st.button("1", on_click=add, args=("1",), key="k1")
+        with k2: st.button("2", on_click=add, args=("2",), key="k2")
+        with k3: st.button("3", on_click=add, args=("3",), key="k3")
+        
+        with k1: st.button("4", on_click=add, args=("4",), key="k4")
+        with k2: st.button("5", on_click=add, args=("5",), key="k5")
+        with k3: st.button("6", on_click=add, args=("6",), key="k6")
+        
+        with k1: st.button("7", on_click=add, args=("7",), key="k7")
+        with k2: st.button("8", on_click=add, args=("8",), key="k8")
+        with k3: st.button("9", on_click=add, args=("9",), key="k9")
+        
+        # Hàng cuối: Xóa - 0 - Back
+        with k1: st.button("C", on_click=clear, key="k_clr") # Clear All
+        with k2: st.button("0", on_click=add, args=("0",), key="k0")
+        with k3: st.button("⌫", on_click=delete, key="k_del") # Backspace
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # --- TỰ ĐỘNG CHECK ---
+        curr = st.session_state.pin_buffer
+        if len(curr) == 4:
             if stored_pin is None:
-                st.info("🆕 Tạo PIN mới (Nhập 4 số)")
+                if st.button("💾 LƯU PIN NÀY", type="primary", use_container_width=True):
+                    set_pin_db(curr)
+                    st.success("Đã tạo PIN!")
+                    time.sleep(1)
+                    st.session_state.logged_in = True
+                    st.session_state.pin_buffer = ""
+                    st.rerun()
             else:
-                st.caption("👇 Nhập mã PIN để mở khóa")
-
-            # --- BÀN PHÍM SỐ (GRID 3x4) ---
-            # Hàm xử lý khi bấm số
-            def add_digit(digit):
-                if len(st.session_state.pin_buffer) < 4:
-                    st.session_state.pin_buffer += digit
-            
-            def clear_pin():
-                st.session_state.pin_buffer = ""
-            
-            def backspace():
-                st.session_state.pin_buffer = st.session_state.pin_buffer[:-1]
-
-            # Dùng container để căn chỉnh nút
-            k1, k2, k3 = st.columns(3)
-            
-            # Hàng 1
-            with k1: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("1", key="btn_1", on_click=add_digit, args=("1",), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            with k2: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("2", key="btn_2", on_click=add_digit, args=("2",), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            with k3: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("3", key="btn_3", on_click=add_digit, args=("3",), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            
-            # Hàng 2
-            with k1: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("4", key="btn_4", on_click=add_digit, args=("4",), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            with k2: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("5", key="btn_5", on_click=add_digit, args=("5",), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            with k3: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("6", key="btn_6", on_click=add_digit, args=("6",), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            # Hàng 3
-            with k1: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("7", key="btn_7", on_click=add_digit, args=("7",), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            with k2: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("8", key="btn_8", on_click=add_digit, args=("8",), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            with k3: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("9", key="btn_9", on_click=add_digit, args=("9",), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            # Hàng 4 (Chức năng)
-            with k1: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("❌", key="btn_clr", on_click=clear_pin, use_container_width=True) # Xóa hết
-                st.markdown('</div>', unsafe_allow_html=True)
-            with k2: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("0", key="btn_0", on_click=add_digit, args=("0",), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            with k3: 
-                st.markdown('<div class="keypad-btn">', unsafe_allow_html=True)
-                st.button("⬅️", key="btn_back", on_click=backspace, use_container_width=True) # Xóa 1 ký tự
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            # --- XỬ LÝ CHECK PIN TỰ ĐỘNG ---
-            current_buffer = st.session_state.pin_buffer
-            
-            # Nếu nhập đủ 4 số thì tự kiểm tra
-            if len(current_buffer) == 4:
-                # Trường hợp 1: Tạo PIN mới
-                if stored_pin is None:
-                    if st.button("LƯU PIN MỚI", type="primary", use_container_width=True):
-                        set_pin_db(current_buffer)
-                        st.success("Đã tạo PIN!")
-                        time.sleep(1)
-                        st.session_state.logged_in = True
-                        st.session_state.pin_buffer = "" # Reset
-                        st.rerun()
-                
-                # Trường hợp 2: Đăng nhập
+                if curr == stored_pin:
+                    st.session_state.logged_in = True
+                    st.session_state.pin_buffer = ""
+                    st.rerun()
                 else:
-                    if current_buffer == stored_pin:
-                        st.session_state.logged_in = True
-                        st.session_state.pin_buffer = "" # Reset để lần sau đăng nhập ko bị lưu
-                        st.rerun()
-                    else:
-                        st.error("❌ Sai mã PIN")
-                        # Tự động reset nếu sai sau 0.5s (Tạo hiệu ứng rung lắc nếu dùng CSS nâng cao, ở đây ta reset buffer)
-                        time.sleep(0.5)
-                        st.session_state.pin_buffer = ""
-                        st.rerun()
+                    st.toast("❌ Sai mã PIN", icon="⚠️")
+                    time.sleep(0.3)
+                    st.session_state.pin_buffer = ""
+                    st.rerun()
 
     st.stop()
 
