@@ -227,70 +227,84 @@ def delete_category_db(cat_name):
     except:
         return False
 
-# --- 5. HỆ THỐNG BẢO MẬT (ĐÃ FIX LỖI GOOGLE SUGGEST) ---
-CONFIG_FILE = "config.json"
-
+# --- 5. HỆ THỐNG BẢO MẬT (LƯU TRÊN SUPABASE - SIÊU BỀN) ---
 def login_system():
-    # Kiểm tra trạng thái đăng nhập
+    # Kiểm tra trạng thái đăng nhập trong phiên làm việc
     if "logged_in" not in st.session_state: 
         st.session_state.logged_in = False
     
-    # Nếu đã đăng nhập -> Cho qua (Return True)
     if st.session_state.logged_in: 
         return True
 
     col1, col2, col3 = st.columns([1,1,1])
     with col2:
-        # Sử dụng container để giữ hiệu ứng kính mờ (Glassmorphism)
         with st.container():
-            st.markdown("<br><h1 style='text-align: center;'>🔐 Z-Wallet</h1>", unsafe_allow_html=True)
+            st.markdown("<br><h1 style='text-align: center;'>🔐 Z-Wallet Cloud</h1>", unsafe_allow_html=True)
             
-            # --- TRƯỜNG HỢP 1: CHƯA CÓ FILE CONFIG (LẦN ĐẦU) ---
-            if not os.path.exists(CONFIG_FILE):
-                st.warning("⚡ Setup PIN bảo mật (4 số)")
-                # Không dùng st.form để tránh trình duyệt hỏi lưu
-                p1 = st.text_input("Tạo PIN mới", type="password", max_chars=4, key="setup_pin")
+            # Hàm lấy PIN từ Supabase
+            def get_pin_from_db():
+                try:
+                    res = supabase.table('app_config').select("value").eq("key", "user_pin").execute()
+                    if res.data:
+                        return res.data[0]['value']
+                    return None # Chưa có PIN
+                except:
+                    return None
+
+            # Hàm lưu PIN mới lên Supabase
+            def set_pin_to_db(new_pin):
+                try:
+                    # Dùng upsert để tạo mới hoặc ghi đè
+                    supabase.table('app_config').upsert({"key": "user_pin", "value": new_pin}).execute()
+                    return True
+                except Exception as e:
+                    st.error(f"Lỗi: {e}")
+                    return False
+
+            # Lấy PIN hiện tại
+            stored_pin = get_pin_from_db()
+
+            # --- TRƯỜNG HỢP 1: CHƯA CÓ PIN TRÊN DB (LẦN ĐẦU) ---
+            if stored_pin is None:
+                st.warning("⚡ Chưa có mã PIN trên Cloud. Hãy tạo mới.")
+                # Dùng key để tránh xung đột
+                p1 = st.text_input("Tạo PIN mới (4 số)", type="password", max_chars=4, key="setup_pin_input")
                 
-                if st.button("KHỞI TẠO", type="primary", use_container_width=True):
+                if st.button("LƯU PIN LÊN CLOUD", type="primary", use_container_width=True):
                     if len(p1) == 4 and p1.isdigit():
-                        with open(CONFIG_FILE, "w") as f: json.dump({"pin": p1}, f)
-                        st.session_state.logged_in = True
-                        st.rerun()
+                        if set_pin_to_db(p1):
+                            st.success("Đã lưu PIN an toàn!")
+                            time.sleep(1)
+                            st.session_state.logged_in = True
+                            st.rerun()
                     else: 
                         st.error("PIN phải là 4 chữ số!")
             
             # --- TRƯỜNG HỢP 2: ĐĂNG NHẬP ---
             else:
-                # Hàm check pin nội bộ
-                def check_pin():
-                    input_val = st.session_state.login_input
-                    with open(CONFIG_FILE, "r") as f: 
-                        stored = json.load(f).get("pin")
-                    
-                    if input_val == stored:
+                # Callback kiểm tra PIN
+                def check_login():
+                    input_val = st.session_state.login_input_cloud
+                    if input_val == stored_pin:
                         st.session_state.logged_in = True
-                        # Không cần rerun ở đây vì on_change sẽ tự refresh, 
-                        # nhưng thêm vào để đảm bảo chuyển trang mượt
                     else:
                         st.toast("❌ Sai mã PIN!", icon="🚫")
 
-                # Ô nhập PIN (Bỏ st.form)
-                # on_change=check_pin: Bấm Enter là tự kiểm tra luôn
+                # Ô nhập PIN (on_change để gõ Enter là vào)
                 st.text_input(
                     "Nhập PIN truy cập", 
                     type="password", 
                     max_chars=4, 
-                    key="login_input",
-                    on_change=check_pin 
+                    key="login_input_cloud",
+                    on_change=check_login
                 )
                 
-                # Nút bấm phụ trợ (cho ai thích bấm chuột)
-                if st.button("🚀 TRUY CẬP NGAY", type="primary", use_container_width=True):
-                    check_pin()
+                if st.button("🚀 TRUY CẬP", type="primary", use_container_width=True):
+                    check_login()
                     if st.session_state.logged_in:
                         st.rerun()
 
-    # Dừng app nếu chưa đăng nhập
+    # Chặn không cho chạy tiếp nếu chưa login
     st.stop()
 
 # --- 6. APP CHÍNH (GIAO DIỆN MỚI) ---
