@@ -18,7 +18,7 @@ except Exception as e:
     st.error("❌ Thiếu cấu hình Supabase!")
     st.stop()
 
-# --- 2. CSS CAO CẤP ---
+# --- 2. CSS CAO CẤP (GIỮ NGUYÊN GIAO DIỆN ĐẸP) ---
 def load_css():
     st.markdown("""
     <style>
@@ -139,6 +139,16 @@ def del_cat(n): supabase.table('categories').delete().eq('ten_danh_muc', n).exec
 def add_method(n): supabase.table('payment_methods').insert({"ten_phuong_thuc": n}).execute()
 def del_method(n): supabase.table('payment_methods').delete().eq('ten_phuong_thuc', n).execute()
 
+# DB PIN Functions
+def get_pin_from_db():
+    try:
+        r = supabase.table('app_config').select("value").eq("key", "user_pin").execute()
+        return r.data[0]['value'] if r.data else None
+    except: return None
+
+def set_pin_db(v):
+    supabase.table('app_config').upsert({"key": "user_pin", "value": v}).execute()
+
 def calculate_kpis(df):
     if df.empty: return 0, 0, 0, 0, 0
     today = pd.Timestamp.now()
@@ -157,50 +167,47 @@ def calculate_kpis(df):
     pct_exp = ((exp - last_exp)/last_exp)*100 if last_exp > 0 else (100 if exp > 0 else 0)
     return inc, exp, bal, pct_inc, pct_exp
 
-# --- 4. HỆ THỐNG ĐĂNG NHẬP (AUTO CHECK) ---
+# --- 4. HỆ THỐNG ĐĂNG NHẬP (AUTO CHECK ON ENTER) ---
 def login_system():
     if "logged_in" not in st.session_state: st.session_state.logged_in = False
     if st.session_state.logged_in: return True
 
-    def get_pin():
-        try:
-            r = supabase.table('app_config').select("value").eq("key", "user_pin").execute()
-            return r.data[0]['value'] if r.data else None
-        except: return None
-    def set_pin(v): supabase.table('app_config').upsert({"key": "user_pin", "value": v}).execute()
-    
-    stored = get_pin()
+    stored = get_pin_from_db()
 
     st.markdown("<div class='login-box'>", unsafe_allow_html=True)
-    st.markdown("<h1>🔒 SmartWallet</h1>", unsafe_allow_html=True)
+    st.markdown("<h1>🔒 SmartWallet Pro</h1>", unsafe_allow_html=True)
     
     if stored is None:
         st.info("🆕 Tạo PIN mới (4 số)")
         def setup_cb():
-            new_p = st.session_state.new_pin
+            new_p = st.session_state.new_pin_val
             if len(new_p)==4 and new_p.isdigit():
-                set_pin(new_p)
+                set_pin_db(new_p)
                 st.success("Đã tạo PIN!")
                 time.sleep(1)
                 st.session_state.logged_in = True
-            else: st.error("PIN phải là 4 chữ số")
+                # st.rerun() handled by state change
+            elif len(new_p) > 0: 
+                st.error("PIN phải là 4 chữ số")
         
-        st.text_input("Nhập PIN mới", type="password", max_chars=4, key="new_pin", on_change=setup_cb)
+        st.text_input("Nhập PIN mới", type="password", max_chars=4, key="new_pin_val", on_change=setup_cb)
     else:
-        def login_cb():
-            input_p = st.session_state.login_pin
+        # Callback kiểm tra PIN ngay khi Enter
+        def check_login():
+            input_p = st.session_state.login_pin_val
             if len(input_p) == 4:
                 if input_p == stored:
                     st.session_state.logged_in = True
                 else:
-                    st.error("Sai mã PIN")
+                    st.toast("❌ Sai mã PIN", icon="⚠️")
             elif len(input_p) > 0:
-                st.warning("Vui lòng nhập đủ 4 số")
+                st.toast("⚠️ Vui lòng nhập đủ 4 số", icon="ℹ️")
 
-        st.text_input("Nhập mã PIN (Ấn Enter)", type="password", max_chars=4, key="login_pin", on_change=login_cb)
+        st.text_input("Nhập mã PIN (Ấn Enter)", type="password", max_chars=4, key="login_pin_val", on_change=check_login)
     
     st.markdown("</div>", unsafe_allow_html=True)
     
+    # Kiểm tra lại lần nữa để rerun nếu vừa đăng nhập thành công
     if st.session_state.logged_in:
         st.rerun()
         
@@ -263,7 +270,7 @@ def main_app():
     tab1, tab2, tab3 = st.tabs(["📊 TỔNG QUAN", "⏳ SỔ NỢ", "⚙️ CÀI ĐẶT"])
 
     with tab1:
-        # KPI Cards (ĐÃ KHÔI PHỤC NEON EFFECT)
+        # KPI Cards
         inc, exp, bal, pi, pe = calculate_kpis(df)
         ci = "text-green" if pi>=0 else "text-red"
         icon_i = "↗" if pi>=0 else "↘"
@@ -403,7 +410,7 @@ def main_app():
             if st.button("Xóa"): del_cat(d); st.rerun()
             
         st.divider()
-        st.markdown("### 💳 Quản lý Phương Thức Thanh Toán")
+        st.markdown("### 💳 Quản lý Phương Thức")
         c3, c4 = st.columns(2)
         with c3: 
             nm = st.text_input("Thêm phương thức (Ví, Thẻ...):")
@@ -413,8 +420,29 @@ def main_app():
             if st.button("Xóa PT"): del_method(dm); st.rerun()
         
         st.divider()
+        
+        # --- ĐỔI MÃ PIN ---
+        st.subheader("🔐 Đổi Mã PIN")
+        cp1, cp2 = st.columns(2)
+        with cp1: old_p = st.text_input("PIN cũ:", type="password")
+        with cp2: new_p = st.text_input("PIN mới (4 số):", type="password", max_chars=4)
+        
+        if st.button("Cập nhật PIN", type="primary"):
+            real_pin = get_pin_from_db()
+            if old_p == real_pin:
+                if len(new_p)==4 and new_p.isdigit():
+                    set_pin_db(new_p)
+                    st.success("Đổi PIN thành công! Vui lòng đăng nhập lại.")
+                    time.sleep(1)
+                    st.session_state.logged_in = False
+                    st.rerun()
+                else: st.warning("PIN mới phải là 4 chữ số")
+            else: st.error("PIN cũ không đúng")
+
+        st.divider()
         if st.button("🔒 ĐĂNG XUẤT KHỎI THIẾT BỊ", type="primary", use_container_width=True):
-            st.session_state.logged_in = False; st.session_state.pin_buffer = ""; st.rerun()
+            st.session_state.logged_in = False
+            st.rerun()
 
 login_system()
 main_app()
